@@ -711,7 +711,7 @@ public class AudioView extends Region {
   }
 
   public final void setTimeZoom(double value) {
-    timeZoom.set(value);
+    timeZoom.set(Math.max(1, value));
   }
 
   public final DoubleProperty frequencyZoomProperty() {
@@ -723,7 +723,7 @@ public class AudioView extends Region {
   }
 
   public final void setFrequencyZoom(double value) {
-    frequencyZoom.set(value);
+    frequencyZoom.set(Math.max(1, value));
   }
 
   public final DoubleProperty timeExpansionFactorProperty() {
