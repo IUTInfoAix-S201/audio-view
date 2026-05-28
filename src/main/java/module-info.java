@@ -3,8 +3,9 @@
  * décodage, la FFT et la lecture restent internes (boîte noire).
  */
 module fr.iutaix.vigiechiro.audio {
+  requires transitive javafx.base;
+  requires transitive javafx.graphics;
   requires javafx.controls;
-  requires javafx.graphics;
   requires java.desktop;
 
   exports fr.iutaix.vigiechiro.audio;

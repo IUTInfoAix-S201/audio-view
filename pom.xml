@@ -6,7 +6,7 @@
 
   <groupId>fr.iutaix.vigiechiro</groupId>
   <artifactId>audio-view</artifactId>
-  <version>1.0.0</version>
+  <version>1.1.0</version>
   <packaging>jar</packaging>
 
   <name>VigieChiro Audio View</name>
@@ -124,7 +124,7 @@
         <configuration>
           <java>
             <googleJavaFormat>
-              <version>1.24.0</version>
+              <version>1.35.0</version>
             </googleJavaFormat>
             <importOrder/>
             <removeUnusedImports/>

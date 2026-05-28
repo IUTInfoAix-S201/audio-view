@@ -95,9 +95,12 @@ Pensez à appeler `audioView.dispose()` à la fermeture pour libérer le périph
 | `durationProperty()` | `ReadOnlyDoubleProperty` | Durée totale en secondes. |
 | `timeZoomProperty()` | `DoubleProperty` | Facteur de zoom temporel (1 = vue complète). |
 | `frequencyZoomProperty()` | `DoubleProperty` | Facteur de zoom fréquentiel (1 = pleine bande). |
+| `timeExpansionFactorProperty()` / `setTimeExpansionFactor(double)` | `DoubleProperty` | Met à l'échelle les libellés des axes (fréquence ×facteur, temps ÷facteur). Ex. `10` pour les WAV ralentis ×10 → axes en unités réelles. Défaut `1`. N'affecte pas `currentTime`/`duration`. |
 | `dispose()` | — | Libère le clip audio. |
 
-Un clic sur le sonogramme ou le spectrogramme déplace le curseur de lecture.
+Le spectrogramme et le sonogramme sont gradués automatiquement : axe **temps** (s) en bas, axe
+**fréquence** (kHz) à gauche, avec des pas « ronds » qui suivent les zooms. Un clic sur le sonogramme
+ou le spectrogramme déplace le curseur de lecture.
 
 ## Développement
 

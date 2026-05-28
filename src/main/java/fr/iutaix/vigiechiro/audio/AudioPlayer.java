@@ -18,8 +18,7 @@ final class AudioPlayer implements AutoCloseable {
 
   private Clip clip;
 
-  void load(Path path)
-      throws IOException, UnsupportedAudioFileException, LineUnavailableException {
+  void load(Path path) throws IOException, UnsupportedAudioFileException, LineUnavailableException {
     close();
     try (AudioInputStream in = AudioSystem.getAudioInputStream(path.toFile())) {
       clip = AudioSystem.getClip();
