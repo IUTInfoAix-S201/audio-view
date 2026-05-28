@@ -99,8 +99,14 @@ Pensez à appeler `audioView.dispose()` à la fermeture pour libérer le périph
 | `dispose()` | — | Libère le clip audio. |
 
 Le spectrogramme et le sonogramme sont gradués automatiquement : axe **temps** (s) en bas, axe
-**fréquence** (kHz) à gauche, avec des pas « ronds » qui suivent les zooms. Un clic sur le sonogramme
-ou le spectrogramme déplace le curseur de lecture.
+**fréquence** (kHz) à gauche, avec des pas « ronds » qui suivent les zooms, et une **légende de
+couleurs** (intensité en dB) en haut à droite du spectrogramme. Un clic sur le sonogramme ou le
+spectrogramme déplace le curseur de lecture.
+
+À l'ouverture d'un fichier, l'affichage s'adapte au contenu : le **sonogramme est mis à l'échelle sur
+le pic** du signal (les enregistrements faibles restent lisibles) et la **vue fréquentielle est
+cadrée sur la bande réellement utilisée**. La lecture s'arrête en fin d'extrait ; un nouveau clic sur
+*Lecture* repart de zéro.
 
 ## Développement
 

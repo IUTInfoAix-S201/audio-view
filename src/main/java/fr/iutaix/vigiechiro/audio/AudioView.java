@@ -98,6 +98,9 @@ public class AudioView extends Region {
   private AudioSample sample;
   private WritableImage spectrogramImage;
 
+  /** Auto-échelle verticale du sonogramme : facteur tel que le pic du fichier remplisse la zone. */
+  private double sonoScale = 1;
+
   public AudioView() {
     Button zoomTimeIn = new Button("Temps +");
     Button zoomTimeOut = new Button("Temps -");
@@ -105,7 +108,7 @@ public class AudioView extends Region {
     Button zoomFreqOut = new Button("Fréq. -");
     zoomTimeIn.setOnAction(e -> timeZoom.set(Math.min(64, timeZoom.get() * 2)));
     zoomTimeOut.setOnAction(e -> timeZoom.set(Math.max(1, timeZoom.get() / 2)));
-    zoomFreqIn.setOnAction(e -> frequencyZoom.set(Math.min(16, frequencyZoom.get() * 2)));
+    zoomFreqIn.setOnAction(e -> frequencyZoom.set(Math.min(64, frequencyZoom.get() * 2)));
     zoomFreqOut.setOnAction(e -> frequencyZoom.set(Math.max(1, frequencyZoom.get() / 2)));
     playButton.setOnAction(e -> togglePlay());
 
@@ -190,6 +193,11 @@ public class AudioView extends Region {
     playing.addListener(
         (o, was, now) -> {
           if (now) {
+            // Si la lecture est en fin d'extrait, un nouveau clic sur Lecture repart de zéro.
+            if (duration.get() > 0 && currentTime.get() >= duration.get()) {
+              player.seek(0);
+              currentTime.set(0);
+            }
             player.play();
             timer.start();
             playButton.setText("Pause");
@@ -218,6 +226,7 @@ public class AudioView extends Region {
     duration.set(0);
     sample = null;
     spectrogramImage = null;
+    sonoScale = 1;
     redraw();
     if (path == null) {
       return;
@@ -236,7 +245,10 @@ public class AudioView extends Region {
         e -> {
           LoadResult result = task.getValue();
           this.sample = result.sample();
+          this.sonoScale = sonoScaleFor(result.sample());
           this.spectrogramImage = buildSpectrogramImage(result.spectrogram());
+          // Cale par défaut la vue fréquentielle sur la bande réellement utilisée par le signal.
+          frequencyZoom.set(autoFrequencyZoom(result.spectrogram()));
           try {
             player.load(path);
           } catch (Exception ignored) {
@@ -329,9 +341,61 @@ public class AudioView extends Region {
         min = Math.min(min, x[i]);
         max = Math.max(max, x[i]);
       }
-      g.strokeLine(plotX + c, mid - max * mid, plotX + c, mid - min * mid);
+      g.strokeLine(plotX + c, mid - max * sonoScale * mid, plotX + c, mid - min * sonoScale * mid);
     }
     drawCursor(g, plotX, plotW, h, start, win);
+  }
+
+  /**
+   * Auto-échelle verticale du sonogramme : facteur tel que le pic du fichier remplisse ~95% de la
+   * demi-hauteur. Les enregistrements de chiroptères étant de faible amplitude, sans cela la forme
+   * d'onde resterait minuscule. Plafonné pour ne pas amplifier démesurément un fichier quasi muet.
+   */
+  private static double sonoScaleFor(AudioSample s) {
+    float peak = 0;
+    for (float v : s.samples()) {
+      float a = Math.abs(v);
+      if (a > peak) {
+        peak = a;
+      }
+    }
+    return peak > 1e-6f ? Math.min(0.95 / peak, 100.0) : 1.0;
+  }
+
+  /**
+   * Zoom fréquentiel par défaut calé sur la bande réellement utilisée : on cherche la fréquence la
+   * plus haute dont l'énergie dépasse un seuil sous le pic, puis on cadre {@code [0, fMax]} avec
+   * une marge. Évite d'afficher une grande zone vide en haut du spectrogramme.
+   */
+  private static double autoFrequencyZoom(Spectrogram spec) {
+    int bins = spec.binCount();
+    int frames = spec.frameCount();
+    if (bins < 2 || frames < 1) {
+      return 1;
+    }
+    double globalMax = -Double.MAX_VALUE;
+    double[] binMax = new double[bins];
+    for (int b = 0; b < bins; b++) {
+      double m = -Double.MAX_VALUE;
+      for (int f = 0; f < frames; f++) {
+        m = Math.max(m, spec.magnitudeDb(f, b));
+      }
+      binMax[b] = m;
+      globalMax = Math.max(globalMax, m);
+    }
+    double seuil = globalMax - 35.0; // dB sous le pic
+    int plusHaut = 0;
+    for (int b = 0; b < bins; b++) {
+      if (binMax[b] >= seuil) {
+        plusHaut = b;
+      }
+    }
+    // Fraction de la bande de Nyquist occupée, avec 30 % de marge au-dessus du dernier cri.
+    double fraction = Math.min(1.0, ((plusHaut + 1) / (double) (bins - 1)) * 1.3);
+    if (fraction <= 0) {
+      return 1;
+    }
+    return Math.max(1, Math.min(64, 1.0 / fraction));
   }
 
   private void drawSpectrogram() {
