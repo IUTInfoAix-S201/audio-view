@@ -22,7 +22,7 @@
     <javafx.platform>linux</javafx.platform>
 
     <junit.version>5.11.3</junit.version>
-    <assertj.version>3.26.3</assertj.version>
+    <assertj.version>3.27.7</assertj.version>
     <testfx.version>4.0.18</testfx.version>
 
     <!-- Outils qualité (alignés sur les TP R2.02 / R2.03). -->
