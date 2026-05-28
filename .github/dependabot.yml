@@ -11,6 +11,9 @@ updates:
       - "maven"
     commit-message:
       prefix: "chore(deps)"
+    ignore:
+      # JavaFX reste figé sur la cible 25 (invariant projet) ; pas de bump auto.
+      - dependency-name: "org.openjfx:*"
 
   # Actions GitHub utilisées dans les workflows
   - package-ecosystem: "github-actions"
