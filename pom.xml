@@ -16,7 +16,7 @@
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-    <javafx.version>25</javafx.version>
+    <javafx.version>26.0.1</javafx.version>
     <!-- Classifier JavaFX par plateforme, utilise UNIQUEMENT pour exécuter les tests.
          Surchargé par les profils plus bas (mac, mac-aarch64, windows). -->
     <javafx.platform>linux</javafx.platform>
