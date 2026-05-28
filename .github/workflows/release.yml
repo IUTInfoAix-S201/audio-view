@@ -1,0 +1,36 @@
+# Release automatique (semantic-release) basée sur les Conventional Commits.
+# Sur push sur main : analyse les commits depuis le dernier tag, calcule la version
+# (feat -> minor, fix -> patch, BREAKING -> major), crée le tag vX.Y.Z + la release
+# GitHub (avec notes de version) en UN seul run, avec le GITHUB_TOKEN (pas de PAT,
+# pas de PR). JitPack construit ensuite ce tag à la demande (la version EST le tag).
+#
+# Config minimale (.releaserc.json) : pas de commit de CHANGELOG sur main (les notes
+# vivent dans la release GitHub), donc aucun commit parasite.
+name: release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # semantic-release a besoin de tout l'historique + les tags
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx --yes semantic-release
