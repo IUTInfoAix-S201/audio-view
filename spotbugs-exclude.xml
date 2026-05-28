@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+  <!-- Les accesseurs xxxProperty() retournent volontairement la Property observable :
+       c'est l'idiome JavaFX (le consommateur s'y abonne / la lie). EI_EXPOSE_REP n'est
+       donc pas pertinent ici, ce n'est pas une fuite de représentation. -->
+  <Match>
+    <Class name="fr.iutaix.vigiechiro.audio.AudioView"/>
+    <Method name="~.*Property"/>
+    <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
+</FindBugsFilter>

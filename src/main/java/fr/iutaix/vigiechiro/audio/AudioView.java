@@ -51,6 +51,11 @@ import javafx.scene.text.TextAlignment;
  * view.setPlaying(true);
  * }</pre>
  */
+// AudioView est volontairement une classe-composant cohésive (API + vue + rendu + lecture en un
+// seul
+// point public, boîte noire pour les étudiants). Les métriques de taille / complexité de classe du
+// ruleset pédagogique ne s'y appliquent pas comme à du code étudiant : on les neutralise.
+@SuppressWarnings({"PMD.GodClass", "PMD.NcssCount", "PMD.CyclomaticComplexity"})
 public class AudioView extends Region {
 
   /** Taille de fenêtre FFT (puissance de deux). */

@@ -39,6 +39,7 @@ jobs:
           java-package: ${{ matrix.java-package }}
           cache: maven
 
-      # Les tests TestFX ont besoin d'un affichage : on utilise un serveur X virtuel.
-      - name: Build et tests (headless)
-        run: xvfb-run -a mvn -B verify
+      # Quality gate complet : enforcer + Spotless(off) + PMD strict (-Pquality-gate) +
+      # SpotBugs + JaCoCo + tests TestFX (headless via serveur X virtuel).
+      - name: Build, qualité et tests (headless)
+        run: xvfb-run -a ./mvnw -B -Pquality-gate verify

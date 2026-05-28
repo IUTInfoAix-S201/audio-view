@@ -24,6 +24,17 @@
     <junit.version>5.11.3</junit.version>
     <assertj.version>3.26.3</assertj.version>
     <testfx.version>4.0.18</testfx.version>
+
+    <!-- Outils qualité (alignés sur les TP R2.02 / R2.03). -->
+    <spotless.maven.plugin.version>3.4.0</spotless.maven.plugin.version>
+    <google.java.format.version>1.35.0</google.java.format.version>
+    <git.build.hook.plugin.version>3.6.0</git.build.hook.plugin.version>
+    <maven.pmd.plugin.version>3.28.0</maven.pmd.plugin.version>
+    <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
+    <spotbugs.maven.plugin.version>4.9.8.3</spotbugs.maven.plugin.version>
+    <jacoco.maven.plugin.version>0.8.14</jacoco.maven.plugin.version>
+    <pitest.maven.plugin.version>1.25.2</pitest.maven.plugin.version>
+    <pitest.junit5.plugin.version>1.2.3</pitest.junit5.plugin.version>
   </properties>
 
   <dependencies>
@@ -114,27 +125,227 @@
         </configuration>
       </plugin>
 
-      <!-- Formatage Google Java Format (aligne sur la convention R2.02 / Spotless).
-           Lancer "mvn spotless:apply" avant de committer. La verification n'est pas
-           attachee a la phase verify pour ne pas bloquer une CI sur du formatage. -->
+      <!-- Formatage Google Java Format (aligne sur les TP R2.02 / R2.03). Lancer
+           "./mvnw spotless:apply" avant de committer ; appele automatiquement par le
+           hook .githooks/pre-commit. Non attache a verify pour ne pas bloquer la CI
+           sur du formatage. -->
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
         <artifactId>spotless-maven-plugin</artifactId>
-        <version>2.43.0</version>
+        <version>${spotless.maven.plugin.version}</version>
         <configuration>
           <java>
             <googleJavaFormat>
-              <version>1.35.0</version>
+              <version>${google.java.format.version}</version>
             </googleJavaFormat>
-            <importOrder/>
             <removeUnusedImports/>
+            <trimTrailingWhitespace/>
+            <endWithNewline/>
           </java>
+        </configuration>
+      </plugin>
+
+      <!-- git-build-hook : configure silencieusement core.hooksPath=.githooks au
+           premier ./mvnw, pour activer le pre-commit Spotless dans chaque clone sans
+           action manuelle (comme les TP R2.02 / R2.03). -->
+      <plugin>
+        <groupId>com.rudikershaw.gitbuildhook</groupId>
+        <artifactId>git-build-hook-maven-plugin</artifactId>
+        <version>${git.build.hook.plugin.version}</version>
+        <configuration>
+          <gitConfig>
+            <core.hooksPath>.githooks</core.hooksPath>
+          </gitConfig>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>configure</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- PMD : analyse statique (memes regles pedagogiques que R2.03). En "verify"
+           il REPORTE sans bloquer (failOnViolation=false) ; le profil quality-gate
+           le rend bloquant (utilise par la CI lint). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-pmd-plugin</artifactId>
+        <version>${maven.pmd.plugin.version}</version>
+        <configuration>
+          <rulesets>
+            <ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
+          </rulesets>
+          <printFailingErrors>true</printFailingErrors>
+          <failOnViolation>false</failOnViolation>
+          <linkXRef>false</linkXRef>
+          <targetJdk>25</targetJdk>
+          <includeTests>false</includeTests>
+        </configuration>
+        <executions>
+          <execution>
+            <id>pmd-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Enforcer : rend exécutables les invariants du CLAUDE.md. Verrouille le JDK 25
+           et Maven, et INTERDIT JavaFX en scope compile/runtime (doit rester provided). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven.enforcer.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-invariants</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[25,)</version>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.9,)</version>
+                </requireMavenVersion>
+                <bannedDependencies>
+                  <searchTransitive>true</searchTransitive>
+                  <excludes>
+                    <exclude>org.openjfx:*:*:*:compile</exclude>
+                    <exclude>org.openjfx:*:*:*:runtime</exclude>
+                  </excludes>
+                  <message>JavaFX doit rester en scope "provided" (jamais compile/runtime).</message>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- SpotBugs : analyse statique sur le bytecode, bloquant en "verify". Pertinent
+           sur le code DSP (indices FFT, bit-ops, decalages signes du decodage WAV). -->
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <version>${spotbugs.maven.plugin.version}</version>
+        <configuration>
+          <effort>Max</effort>
+          <threshold>Medium</threshold>
+          <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- JaCoCo : couverture. Le gate (check) est SCOPÉ aux classes pures testables
+           (Fft, Spectrogram, AudioSample) ; le rendu JavaFX d'AudioView, non testable
+           raisonnablement en headless, est hors gate. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.maven.plugin.version}</version>
+        <executions>
+          <execution>
+            <id>jacoco-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-check-classes-pures</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>CLASS</element>
+                  <includes>
+                    <include>fr.iutaix.vigiechiro.audio.Fft</include>
+                    <include>fr.iutaix.vigiechiro.audio.Spectrogram</include>
+                    <include>fr.iutaix.vigiechiro.audio.AudioSample</include>
+                  </includes>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.80</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- PITest : mutation testing, SCOPÉ aux classes pures. Non lié à verify (lent) :
+           lancer "./mvnw test-compile pitest:mutationCoverage". Montre si les tests
+           attrapent vraiment les bugs (qualité), pas seulement la couverture. -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>${pitest.maven.plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>${pitest.junit5.plugin.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <targetClasses>
+            <param>fr.iutaix.vigiechiro.audio.Fft</param>
+            <param>fr.iutaix.vigiechiro.audio.Spectrogram</param>
+            <param>fr.iutaix.vigiechiro.audio.AudioSample</param>
+          </targetClasses>
+          <targetTests>
+            <param>fr.iutaix.vigiechiro.audio.FftTest</param>
+            <param>fr.iutaix.vigiechiro.audio.SpectrogramTest</param>
+            <param>fr.iutaix.vigiechiro.audio.AudioSampleTest</param>
+          </targetTests>
         </configuration>
       </plugin>
     </plugins>
   </build>
 
   <profiles>
+    <!-- Quality gate : PMD bloque sur violation. Active via "./mvnw -Pquality-gate verify"
+         et par la CI lint. -->
+    <profile>
+      <id>quality-gate</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-pmd-plugin</artifactId>
+            <configuration>
+              <failOnViolation>true</failOnViolation>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
     <profile>
       <id>mac</id>
       <activation>

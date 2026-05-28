@@ -1,0 +1,10 @@
+name: Question
+description: Poser une question sur l'utilisation du composant audio-view
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Votre question
+    validations:
+      required: true

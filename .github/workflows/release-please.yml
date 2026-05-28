@@ -1,0 +1,27 @@
+# Release automatique basée sur les Conventional Commits.
+# release-please ouvre/maintient une "release PR" qui bump la version du pom.xml et
+# le CHANGELOG ; à son merge, il crée le tag vX.Y.Z + la release GitHub. JitPack
+# construit alors ce tag à la demande (la version EST le tag).
+#
+# Prérequis repo : Settings > Actions > General > Workflow permissions
+#   -> "Read and write permissions" + "Allow GitHub Actions to create and approve pull requests".
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

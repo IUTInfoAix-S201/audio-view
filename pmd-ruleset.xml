@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<ruleset name="audio-view - Qualité de développement"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Ruleset aligné sur celui des TP R2.03 (mêmes seuils que ce que voient les
+        étudiants). Règles orientées smells / refactoring (Fowler).
+
+        Usage :
+          ./mvnw verify                  # PMD en warning, ne bloque pas
+          ./mvnw pmd:check               # rapport console seul
+          ./mvnw -Pquality-gate verify   # PMD bloque (CI lint)
+
+        Bypass ponctuel : @SuppressWarnings("PMD.NomDeLaRegle") sur méthode/classe.
+    </description>
+
+    <!-- Long method -> Extract Method -->
+    <rule ref="category/java/design.xml/NcssCount">
+        <properties>
+            <property name="methodReportLevel" value="40"/>
+            <property name="classReportLevel" value="200"/>
+        </properties>
+    </rule>
+
+    <!-- Long parameter list -> Introduce Parameter Object -->
+    <rule ref="category/java/design.xml/ExcessiveParameterList">
+        <properties>
+            <property name="minimum" value="6"/>
+        </properties>
+    </rule>
+
+    <!-- Cyclomatic complexity -> Extract Method / Polymorphisme -->
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="15"/>
+            <property name="classReportLevel" value="80"/>
+        </properties>
+    </rule>
+
+    <!-- Deeply nested ifs -> Early return / Guard clauses -->
+    <rule ref="category/java/design.xml/AvoidDeeplyNestedIfStmts">
+        <properties>
+            <property name="problemDepth" value="4"/>
+        </properties>
+    </rule>
+
+    <!-- God class -> Extract Class -->
+    <rule ref="category/java/design.xml/GodClass"/>
+
+    <!-- Magic number / string dupliqué -> Replace with Symbolic Constant -->
+    <rule ref="category/java/errorprone.xml/AvoidDuplicateLiterals">
+        <properties>
+            <property name="maxDuplicateLiterals" value="3"/>
+            <property name="minimumLength" value="3"/>
+            <property name="exceptionList" value="&quot;&quot;"/>
+            <property name="skipAnnotations" value="true"/>
+        </properties>
+    </rule>
+
+    <!-- Best practice : pas de réassignation de paramètre -->
+    <rule ref="category/java/bestpractices.xml/AvoidReassigningParameters"/>
+
+</ruleset>
