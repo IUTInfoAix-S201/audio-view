@@ -10,18 +10,33 @@ permissions:
 
 jobs:
   build:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      # On veut le resultat des deux JDK meme si l'un echoue.
+      fail-fast: false
+      matrix:
+        include:
+          # JDK vanilla (sans JavaFX embarque) : prouve que la config Maven est
+          # portable (les modules OpenJFX viennent des artefacts classifies, pas
+          # du JDK). C'est aussi la condition du build JitPack.
+          - name: Temurin 25 (JDK vanilla)
+            distribution: temurin
+            java-package: jdk
+          # JDK Zulu avec JavaFX embarque (jdk+fx) : filet de securite, aligne sur
+          # le poste de dev (fx-zulu) et la CI des TP R2.02.
+          - name: Zulu 25 (JDK + JavaFX)
+            distribution: zulu
+            java-package: jdk+fx
     steps:
       - uses: actions/checkout@v6
 
-      # JDK Zulu 25 avec JavaFX embarque (jdk+fx) : fournit les modules javafx.*
-      # comme modules systeme (comme en local). Aligne sur la CI des TP R2.02.
-      - name: Configurer JDK 25 avec JavaFX (Zulu)
+      - name: Configurer JDK 25 (${{ matrix.distribution }} / ${{ matrix.java-package }})
         uses: actions/setup-java@v5
         with:
           java-version: '25'
-          distribution: 'zulu'
-          java-package: 'jdk+fx'
+          distribution: ${{ matrix.distribution }}
+          java-package: ${{ matrix.java-package }}
           cache: maven
 
       # Les tests TestFX ont besoin d'un affichage : on utilise un serveur X virtuel.
