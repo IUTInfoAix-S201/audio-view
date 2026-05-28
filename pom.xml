@@ -27,13 +27,36 @@
   </properties>
 
   <dependencies>
-    <!-- JavaFX en "provided" : le composant compile contre, mais c'est le projet
-         consommateur (le template etudiant) qui fournit JavaFX 25 et gere les natifs
-         par OS via son javafx-maven-plugin. On evite ainsi les conflits de classifiers. -->
+    <!-- JavaFX en scope "provided" : non transitif, donc invisible pour le projet
+         consommateur (le template etudiant apporte sa propre version de JavaFX et
+         gere les natifs par OS via son javafx-maven-plugin).
+
+         Le classifier ${javafx.platform} (regle par les profils OS plus bas) est
+         INDISPENSABLE : les artefacts OpenJFX sans classifier sont des jars vides,
+         sans module-info, ce qui casse la compilation modulaire sur une JVM qui
+         n'embarque pas JavaFX. base et graphics sont declares explicitement car la
+         resolution transitive ne ramenerait sinon que ces stubs vides. Cette config
+         compile donc sur n'importe quel JDK 25+ (Temurin, OpenJDK, Zulu fx...), ce
+         qui rend aussi le build JitPack independant du JDK propose. -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-base</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${javafx.platform}</classifier>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-graphics</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${javafx.platform}</classifier>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-controls</artifactId>
       <version>${javafx.version}</version>
+      <classifier>${javafx.platform}</classifier>
       <scope>provided</scope>
     </dependency>
 
@@ -60,16 +83,6 @@
       <groupId>org.testfx</groupId>
       <artifactId>testfx-junit5</artifactId>
       <version>${testfx.version}</version>
-      <scope>test</scope>
-    </dependency>
-
-    <!-- Natifs JavaFX necessaires a l'execution des tests (rendu reel sous Xvfb).
-         Le jar classifie contient classes + bibliotheques natives de la plateforme. -->
-    <dependency>
-      <groupId>org.openjfx</groupId>
-      <artifactId>javafx-graphics</artifactId>
-      <version>${javafx.version}</version>
-      <classifier>${javafx.platform}</classifier>
       <scope>test</scope>
     </dependency>
   </dependencies>

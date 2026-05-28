@@ -130,8 +130,11 @@ Le wrapper Maven n'est pas committé ici ; pour l'ajouter, exécutez une fois `m
 
 ## Remarque sur le JDK côté JitPack
 
-Si JitPack ne propose pas encore `openjdk25`, basculez le `jitpack.yml` sur l'installation manuelle
-d'un Temurin 25 (snippet commenté fourni dans le fichier).
+Le composant compile sur **n'importe quel JDK 25+** : les modules JavaFX sont récupérés par Maven
+sous forme d'artefacts OpenJFX classifiés (`${javafx.platform}`, réglé par les profils OS du
+`pom.xml`), donc aucun JDK à JavaFX embarqué n'est nécessaire côté JitPack. Si JitPack ne propose
+pas encore `openjdk25`, basculez le `jitpack.yml` sur l'installation manuelle d'un Temurin 25
+(snippet commenté fourni dans le fichier).
 
 ## Licence
 
