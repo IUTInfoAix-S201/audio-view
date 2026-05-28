@@ -1,0 +1,17 @@
+# JitPack lit ce fichier pour construire la bibliotheque a partir d'un tag Git.
+#
+# Si JitPack propose deja "openjdk25", ce bloc suffit :
+jdk:
+  - openjdk25
+
+# Sinon (JDK 25 pas encore disponible cote JitPack), remplacez le bloc "jdk" ci-dessus
+# par une installation manuelle d'un Temurin 25 :
+#
+# before_install:
+#   - curl -L -o jdk.tar.gz "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jdk/hotspot/normal/eclipse"
+#   - mkdir -p jdk && tar -xzf jdk.tar.gz -C jdk --strip-components=1
+#   - export JAVA_HOME=$PWD/jdk
+#   - export PATH=$JAVA_HOME/bin:$PATH
+#
+# install:
+#   - mvn -DskipTests install
