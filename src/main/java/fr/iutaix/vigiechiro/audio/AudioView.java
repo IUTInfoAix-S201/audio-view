@@ -477,7 +477,9 @@ public class AudioView extends Region {
 
     double range = MAX_DB - MIN_DB;
     double step = niceStep(range, 4);
-    for (double db = MIN_DB; db <= MAX_DB + 1e-6; db += step) {
+    int nTicks = (int) Math.round(range / step);
+    for (int i = 0; i <= nTicks; i++) {
+      double db = MIN_DB + i * step;
       double y = stripTop + barH * (1 - (db - MIN_DB) / range);
       Label valeur = new Label(formatAxis(db, step));
       valeur.setFont(AXIS_FONT);
@@ -527,7 +529,9 @@ public class AudioView extends Region {
     g.setFont(AXIS_FONT);
     g.setTextBaseline(VPos.CENTER);
     double stepHz = niceStep(fMaxHz, 5);
-    for (double f = 0; f <= fMaxHz + 1e-6; f += stepHz) {
+    int nTicks = (int) Math.floor(fMaxHz / stepHz);
+    for (int i = 0; i <= nTicks; i++) {
+      double f = i * stepHz;
       double y = plotH * (1 - f / fMaxHz);
       g.setStroke(AXIS_GRID);
       g.setLineWidth(1);
@@ -559,8 +563,10 @@ public class AudioView extends Region {
     g.setFont(AXIS_FONT);
     g.setTextBaseline(VPos.TOP);
     g.setTextAlign(TextAlignment.CENTER);
-    double first = Math.ceil(t0 / step) * step;
-    for (double t = first; t <= t1 + 1e-9; t += step) {
+    int firstIndex = (int) Math.ceil(t0 / step);
+    int lastIndex = (int) Math.floor(t1 / step);
+    for (int i = firstIndex; i <= lastIndex; i++) {
+      double t = i * step;
       double x = plotX + plotW * ((t - t0) / range);
       g.setStroke(AXIS_GRID);
       g.setLineWidth(1);
