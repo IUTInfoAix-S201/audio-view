@@ -70,6 +70,13 @@
       <classifier>${javafx.platform}</classifier>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
+      <version>${javafx.version}</version>
+      <classifier>${javafx.platform}</classifier>
+      <scope>provided</scope>
+    </dependency>
 
     <!-- Tests : JUnit 5 + AssertJ + TestFX -->
     <dependency>

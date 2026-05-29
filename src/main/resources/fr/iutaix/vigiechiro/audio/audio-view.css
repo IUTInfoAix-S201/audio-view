@@ -1,0 +1,124 @@
+/*
+ * Feuille de style du composant AudioView. Toute la « chrome » (barre d'outils, fonds, curseur,
+ * axes, légende) est thémable ici. La couleur de l'enveloppe du sonogramme — tracée sur Canvas,
+ * donc invisible au moteur CSS — est exposée via la propriété stylable -fx-wave-color sur la racine
+ * .audio-view (voir AudioView.StyleableProperties).
+ *
+ * Pour personnaliser sans toucher au Java : surcharger ces classes dans une feuille appliquée après,
+ * ou remplacer cette feuille.
+ */
+
+.audio-view {
+  -fx-background-color: #0b0f14;
+  -fx-wave-color: #7fd4ff;
+}
+
+/* Barre d'outils */
+.audio-view-toolbar {
+  -fx-background-color: #11161d;
+}
+
+.audio-view-toolbar .button {
+  -fx-background-color: #1c2530;
+  -fx-text-fill: #d6dde6;
+  -fx-background-radius: 4;
+  -fx-padding: 3 10 3 10;
+  -fx-cursor: hand;
+}
+
+.audio-view-toolbar .button:hover {
+  -fx-background-color: #27333f;
+}
+
+.audio-view-toolbar .label {
+  -fx-text-fill: #9aa4ad;
+}
+
+/* Zones de tracé (fond des sonogramme/spectrogramme et de leurs gouttières) */
+.audio-view-plot-area {
+  -fx-background-color: #0b0f14;
+}
+
+/* Curseur de lecture */
+.audio-view-cursor {
+  -fx-stroke: #ff5252;
+  -fx-stroke-width: 1.5;
+}
+
+/* Axes : grille, marques, libellés */
+.audio-view-grid {
+  -fx-stroke: rgba(255, 255, 255, 0.10);
+}
+
+.audio-view-tick {
+  -fx-stroke: #9aa4ad;
+}
+
+.audio-view-axis-label {
+  -fx-text-fill: #9aa4ad;
+  -fx-font-size: 10;
+}
+
+/* Légende des couleurs (dB) */
+.audio-view-legend {
+  -fx-background-color: rgba(11, 15, 20, 0.6);
+  -fx-background-radius: 6;
+}
+
+.audio-view-legend .label {
+  -fx-text-fill: #9aa4ad;
+  -fx-font-size: 10;
+}
+
+/* ============================================================================
+ * Thème clair : activé par la pseudo-classe :light (AudioView.setLightTheme).
+ * Surcharge les mêmes sélecteurs ; le spectrogramme (image d'intensité) reste
+ * volontairement sombre, comme dans les visualiseurs usuels.
+ * ========================================================================= */
+
+.audio-view:light {
+  -fx-background-color: #eef1f4;
+  -fx-wave-color: #1f6fb2;
+}
+
+.audio-view:light .audio-view-toolbar {
+  -fx-background-color: #dfe4ea;
+}
+
+.audio-view:light .audio-view-toolbar .button {
+  -fx-background-color: #ffffff;
+  -fx-text-fill: #2c3e50;
+}
+
+.audio-view:light .audio-view-toolbar .button:hover {
+  -fx-background-color: #d3dbe3;
+}
+
+.audio-view:light .audio-view-toolbar .label {
+  -fx-text-fill: #2c3e50;
+}
+
+/* Sonogramme : fond clair. Spectrogramme : on garde un fond sombre pour l'image. */
+.audio-view:light .audio-view-plot-area {
+  -fx-background-color: #f4f6f8;
+}
+
+.audio-view:light .audio-view-grid {
+  -fx-stroke: rgba(0, 0, 0, 0.12);
+}
+
+.audio-view:light .audio-view-tick {
+  -fx-stroke: #5a6570;
+}
+
+.audio-view:light .audio-view-axis-label {
+  -fx-text-fill: #2c3e50;
+}
+
+.audio-view:light .audio-view-legend {
+  -fx-background-color: rgba(255, 255, 255, 0.75);
+}
+
+.audio-view:light .audio-view-legend .label {
+  -fx-text-fill: #2c3e50;
+}

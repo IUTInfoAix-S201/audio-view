@@ -1,39 +1,43 @@
 package fr.iutaix.vigiechiro.audio;
 
+import java.io.IOException;
 import java.nio.file.Path;
-import javafx.animation.AnimationTimer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
-import javafx.beans.property.ReadOnlyDoubleWrapper;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
-import javafx.beans.property.SimpleObjectProperty;
-import javafx.concurrent.Task;
-import javafx.geometry.HPos;
+import javafx.css.CssMetaData;
+import javafx.css.PseudoClass;
+import javafx.css.Styleable;
+import javafx.css.StyleableObjectProperty;
+import javafx.css.StyleableProperty;
+import javafx.css.converter.ColorConverter;
+import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.geometry.VPos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.image.PixelWriter;
+import javafx.scene.image.ImageView;
 import javafx.scene.image.WritableImage;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Pane;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
+import javafx.scene.shape.Line;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.text.Font;
-import javafx.scene.text.TextAlignment;
 
 /**
  * Composant JavaFX affichant le sonogramme (amplitude / temps) et le spectrogramme (fréquence /
@@ -44,6 +48,13 @@ import javafx.scene.text.TextAlignment;
  * réalisés en tâche de fond. On observe ensuite {@link #currentTimeProperty()} et {@link
  * #durationProperty()} pour se synchroniser avec le reste de l'application.
  *
+ * <p>Architecture MVVM : l'état et la logique vivent dans {@link AudioViewModel} ; cette classe est
+ * la <b>vue</b>, un custom control <i>fx:root</i> ({@code extends BorderPane}) qui charge {@code
+ * AudioView.fxml} au constructeur ({@link FXMLLoader#setRoot}/{@link FXMLLoader#setController}) et
+ * se lie au ViewModel par bindings. Le spectrogramme est un {@link ImageView} recadré par {@code
+ * viewport}, le curseur et les axes sont de vrais nœuds ; seule l'enveloppe du sonogramme (des
+ * milliers de segments par colonne) reste tracée sur {@link Canvas}.
+ *
  * <pre>{@code
  * AudioView view = new AudioView();
  * view.setAudioFile(Path.of("samples/seq_0001.wav"));
@@ -51,21 +62,10 @@ import javafx.scene.text.TextAlignment;
  * view.setPlaying(true);
  * }</pre>
  */
-// AudioView est volontairement une classe-composant cohésive (API + vue + rendu + lecture en un
-// seul
-// point public, boîte noire pour les étudiants). Les métriques de taille / complexité de classe du
-// ruleset pédagogique ne s'y appliquent pas comme à du code étudiant : on les neutralise.
+// Classe-vue cohésive (rendu Canvas + nœuds + chrome + délégation). Métriques de taille
+// neutralisées.
 @SuppressWarnings({"PMD.GodClass", "PMD.NcssCount", "PMD.CyclomaticComplexity"})
-public class AudioView extends Region {
-
-  /** Taille de fenêtre FFT (puissance de deux). */
-  private static final int FFT_SIZE = 1024;
-
-  /** Pas entre deux fenêtres FFT successives, en échantillons. */
-  private static final int HOP = 256;
-
-  private static final double MIN_DB = -90.0;
-  private static final double MAX_DB = -10.0;
+public class AudioView extends BorderPane {
 
   /**
    * Largeur de la gouttière gauche (graduations de fréquence) et hauteur de celle du bas (temps).
@@ -73,267 +73,205 @@ public class AudioView extends Region {
   private static final double AXIS_LEFT = 48;
 
   private static final double AXIS_BOTTOM = 26;
-  private static final Color AXIS_BG = Color.web("#0b0f14");
   private static final Color AXIS_TEXT = Color.web("#9aa4ad");
-  private static final Color AXIS_GRID = Color.web("#ffffff", 0.10);
-  private static final Font AXIS_FONT = Font.font(10);
-  private static final LinearGradient COLORBAR_GRADIENT = buildColorbarGradient();
+  private static final Color WAVE_COLOR_DEFAULT = Color.web("#7fd4ff");
 
-  // ----- Propriétés publiques -----
-  private final ObjectProperty<Path> audioFile = new SimpleObjectProperty<>(this, "audioFile");
-  private final BooleanProperty playing = new SimpleBooleanProperty(this, "playing", false);
-  private final ReadOnlyDoubleWrapper currentTime =
-      new ReadOnlyDoubleWrapper(this, "currentTime", 0);
-  private final ReadOnlyDoubleWrapper duration = new ReadOnlyDoubleWrapper(this, "duration", 0);
-  private final DoubleProperty timeZoom = new SimpleDoubleProperty(this, "timeZoom", 1);
-  private final DoubleProperty frequencyZoom = new SimpleDoubleProperty(this, "frequencyZoom", 1);
-  private final DoubleProperty timeExpansion =
-      new SimpleDoubleProperty(this, "timeExpansionFactor", 1);
+  /** Pseudo-classe CSS {@code :light} : bascule le thème clair (voir {@code audio-view.css}). */
+  private static final PseudoClass LIGHT_THEME = PseudoClass.getPseudoClass("light");
 
-  // ----- Vue interne -----
-  private final VBox content = new VBox();
-  private final Canvas sonoCanvas = new Canvas();
-  private final Canvas spectroCanvas = new Canvas();
-  private final Label timeLabel = new Label("0.00 / 0.00 s");
-  private final Button playButton = new Button("Lecture");
-  private final AudioPlayer player = new AudioPlayer();
-  private final AnimationTimer timer;
+  /**
+   * Couleur de l'enveloppe du sonogramme, stylable via {@code -fx-wave-color} sur {@code
+   * .audio-view}. Comme elle est tracée sur Canvas (invisible au moteur CSS), elle est exposée par
+   * une {@link StyleableObjectProperty} + {@link CssMetaData} ; tout changement redessine le tracé.
+   */
+  private final StyleableObjectProperty<Color> waveColor =
+      new StyleableObjectProperty<>(WAVE_COLOR_DEFAULT) {
+        @Override
+        public Object getBean() {
+          return AudioView.this;
+        }
 
-  // ----- État audio -----
-  private AudioSample sample;
-  private WritableImage spectrogramImage;
+        @Override
+        public String getName() {
+          return "waveColor";
+        }
 
-  /** Auto-échelle verticale du sonogramme : facteur tel que le pic du fichier remplisse la zone. */
-  private double sonoScale = 1;
+        @Override
+        public CssMetaData<? extends Styleable, Color> getCssMetaData() {
+          return StyleableProperties.WAVE_COLOR;
+        }
+
+        @Override
+        protected void invalidated() {
+          drawSonogram();
+        }
+      };
+
+  /**
+   * Active le thème clair. Bascule la pseudo-classe CSS {@code :light} sur le composant ; tout le
+   * rendu (chrome et couleur du sonogramme) est alors pris dans les règles {@code
+   * .audio-view:light} de {@code audio-view.css}. Faux par défaut (thème sombre).
+   */
+  private final BooleanProperty lightTheme =
+      new BooleanPropertyBase(false) {
+        @Override
+        protected void invalidated() {
+          applyTheme(get());
+        }
+
+        @Override
+        public Object getBean() {
+          return AudioView.this;
+        }
+
+        @Override
+        public String getName() {
+          return "lightTheme";
+        }
+      };
+
+  private final AudioViewModel vm = new AudioViewModel();
+
+  // ----- Vue (injectée depuis AudioView.fxml) -----
+  @FXML private VBox plots;
+  @FXML private StackPane plotsStack;
+  @FXML private Pane sonoHost;
+  @FXML private Pane spectroHost;
+  @FXML private Canvas sonoCanvas;
+  @FXML private Line sonoCursor;
+  @FXML private ImageView spectroImage;
+  @FXML private Pane axisLayer;
+  @FXML private Line spectroCursor;
+  @FXML private Pane legend;
+  @FXML private Label timeLabel;
+  @FXML private Button playButton;
+
+  // Bande dégradée de la légende dB (construite par le contrôleur), réactualisée au changement de
+  // thème pour refléter la colormap active.
+  private Rectangle colorbarBande;
 
   public AudioView() {
-    Button zoomTimeIn = new Button("Temps +");
-    Button zoomTimeOut = new Button("Temps -");
-    Button zoomFreqIn = new Button("Fréq. +");
-    Button zoomFreqOut = new Button("Fréq. -");
-    zoomTimeIn.setOnAction(e -> timeZoom.set(Math.min(64, timeZoom.get() * 2)));
-    zoomTimeOut.setOnAction(e -> timeZoom.set(Math.max(1, timeZoom.get() / 2)));
-    zoomFreqIn.setOnAction(e -> frequencyZoom.set(Math.min(64, frequencyZoom.get() * 2)));
-    zoomFreqOut.setOnAction(e -> frequencyZoom.set(Math.max(1, frequencyZoom.get() / 2)));
-    playButton.setOnAction(e -> togglePlay());
+    FXMLLoader loader = new FXMLLoader(getClass().getResource("AudioView.fxml"));
+    loader.setRoot(this);
+    loader.setController(this);
+    try {
+      loader.load();
+    } catch (IOException e) {
+      throw new IllegalStateException("Chargement de AudioView.fxml impossible", e);
+    }
+  }
 
-    HBox toolbar =
-        new HBox(8, playButton, zoomTimeIn, zoomTimeOut, zoomFreqIn, zoomFreqOut, timeLabel);
-    toolbar.setAlignment(Pos.CENTER_LEFT);
-    toolbar.setPadding(new Insets(6));
+  /** Câblage vue ↔ ViewModel, appelé par le FXMLLoader après injection des champs {@code @FXML}. */
+  @FXML
+  private void initialize() {
+    playButton
+        .textProperty()
+        .bind(Bindings.when(vm.playingProperty()).then("Pause").otherwise("Lecture"));
+    timeLabel.textProperty().bind(vm.timeTextProperty());
 
-    // Légende des couleurs : noeuds (Rectangle dégradé + Labels) superposés en haut-droite du
-    // spectrogramme via un StackPane, placés par le layout + un binding (translateY suit la hauteur
-    // du sonogramme).
-    Pane legende = buildColorbarLegend();
-
-    // Chaque Canvas est enveloppé dans un Pane de taille minimale nulle. Sinon le Canvas (non
-    // redimensionnable) impose sa taille courante comme minimum, ce qui empêche la mise en page de
-    // RÉTRÉCIR (l'agrandissement fonctionnait, pas la réduction). Le Canvas suit la taille de son
-    // hôte par binding.
-    Pane sonoHost = new Pane(sonoCanvas);
-    Pane spectroHost = new Pane(spectroCanvas);
-    sonoHost.setMinSize(0, 0);
-    spectroHost.setMinSize(0, 0);
+    // Sonogramme : le Canvas (non redimensionnable) suit son hôte à taille minimale nulle.
     sonoCanvas.widthProperty().bind(sonoHost.widthProperty());
     sonoCanvas.heightProperty().bind(sonoHost.heightProperty());
-    spectroCanvas.widthProperty().bind(spectroHost.widthProperty());
-    spectroCanvas.heightProperty().bind(spectroHost.heightProperty());
 
-    VBox plots = new VBox(2, sonoHost, spectroHost);
+    // Spectrogramme : l'image remplit la zone de tracé (hôte moins les gouttières) ; le recadrage
+    // temps/fréquence se fait par viewport (mis à jour dans updateSpectrogram).
+    spectroImage.setLayoutX(AXIS_LEFT);
+    spectroImage.setLayoutY(0);
+    spectroImage.setPreserveRatio(false);
+    spectroImage.fitWidthProperty().bind(spectroHost.widthProperty().subtract(AXIS_LEFT));
+    spectroImage.fitHeightProperty().bind(spectroHost.heightProperty().subtract(AXIS_BOTTOM));
+    axisLayer.prefWidthProperty().bind(spectroHost.widthProperty());
+    axisLayer.prefHeightProperty().bind(spectroHost.heightProperty());
+
+    // Répartition verticale sonogramme / spectrogramme (32 % / 68 %).
     sonoHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.32));
     spectroHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.68).subtract(2));
 
-    StackPane plotsStack = new StackPane(plots, legende);
-    StackPane.setAlignment(legende, Pos.TOP_RIGHT);
-    StackPane.setMargin(legende, new Insets(0, 8, 0, 0));
-    legende.translateYProperty().bind(sonoCanvas.heightProperty().add(8));
+    buildColorbarLegend();
+    StackPane.setMargin(legend, new Insets(0, 8, 0, 0));
+    legend.translateYProperty().bind(sonoCanvas.heightProperty().add(8));
 
-    content.setFillWidth(true);
-    content.getChildren().addAll(toolbar, plotsStack);
-    VBox.setVgrow(plotsStack, Priority.ALWAYS);
-    getChildren().add(content);
+    // Redessins/repositions : tout changement d'état du ViewModel ou de taille redéclenche le
+    // rendu.
+    sonoCanvas.widthProperty().addListener((o, a, b) -> refresh());
+    sonoCanvas.heightProperty().addListener((o, a, b) -> refresh());
+    spectroHost.widthProperty().addListener((o, a, b) -> refresh());
+    spectroHost.heightProperty().addListener((o, a, b) -> refresh());
+    vm.timeZoomProperty().addListener((o, a, b) -> refresh());
+    vm.frequencyZoomProperty().addListener((o, a, b) -> refresh());
+    vm.timeExpansionFactorProperty().addListener((o, a, b) -> refresh());
+    vm.currentTimeProperty().addListener((o, a, b) -> refresh());
+    vm.durationProperty().addListener((o, a, b) -> refresh());
+    vm.spectrogramImageProperty().addListener((o, a, b) -> refresh());
+    vm.sampleProperty().addListener((o, a, b) -> refresh());
 
-    // Redessins
-    Runnable redraw = this::redraw;
-    sonoCanvas.widthProperty().addListener((o, a, b) -> redraw.run());
-    sonoCanvas.heightProperty().addListener((o, a, b) -> redraw.run());
-    spectroCanvas.widthProperty().addListener((o, a, b) -> redraw.run());
-    spectroCanvas.heightProperty().addListener((o, a, b) -> redraw.run());
-    timeZoom.addListener((o, a, b) -> redraw.run());
-    frequencyZoom.addListener((o, a, b) -> redraw.run());
-    timeExpansion.addListener(
-        (o, a, b) -> {
-          updateTimeLabel();
-          redraw.run();
-        });
-    currentTime.addListener(
-        (o, a, b) -> {
-          updateTimeLabel();
-          redraw.run();
-        });
-    duration.addListener((o, a, b) -> updateTimeLabel());
-
-    // Déplacement du curseur de lecture par clic
-    spectroCanvas.setOnMousePressed(e -> seekFromX(e.getX(), spectroCanvas.getWidth()));
-    sonoCanvas.setOnMousePressed(e -> seekFromX(e.getX(), sonoCanvas.getWidth()));
-
-    audioFile.addListener((o, oldFile, newFile) -> loadAudio(newFile));
-
-    // timer doit etre assigne avant le listener "playing" qui le capture (champ final).
-    timer =
-        new AnimationTimer() {
-          @Override
-          public void handle(long now) {
-            double pos = player.position();
-            if (duration.get() > 0 && pos >= duration.get()) {
-              currentTime.set(duration.get());
-              setPlaying(false);
-              return;
-            }
-            currentTime.set(pos);
-          }
-        };
-
-    playing.addListener(
-        (o, was, now) -> {
-          if (now) {
-            // Si la lecture est en fin d'extrait, un nouveau clic sur Lecture repart de zéro.
-            if (duration.get() > 0 && currentTime.get() >= duration.get()) {
-              player.seek(0);
-              currentTime.set(0);
-            }
-            player.play();
-            timer.start();
-            playButton.setText("Pause");
-          } else {
-            player.pause();
-            timer.stop();
-            playButton.setText("Lecture");
-          }
-        });
-
-    setMinSize(200, 120);
-    setPrefSize(640, 360);
+    // Déplacement du curseur de lecture par clic.
+    spectroHost.setOnMousePressed(e -> seekFromX(e.getX(), spectroHost.getWidth()));
+    sonoHost.setOnMousePressed(e -> seekFromX(e.getX(), sonoHost.getWidth()));
   }
 
-  @Override
-  protected void layoutChildren() {
-    layoutInArea(content, 0, 0, getWidth(), getHeight(), 0, HPos.LEFT, VPos.TOP);
+  // ----- Commandes (handlers FXML) -----
+
+  @FXML
+  private void onTogglePlay() {
+    vm.togglePlay();
   }
 
-  // ----- Chargement -----
-
-  private void loadAudio(Path path) {
-    setPlaying(false);
-    player.close();
-    currentTime.set(0);
-    duration.set(0);
-    sample = null;
-    spectrogramImage = null;
-    sonoScale = 1;
-    redraw();
-    if (path == null) {
-      return;
-    }
-
-    Task<LoadResult> task =
-        new Task<>() {
-          @Override
-          protected LoadResult call() throws Exception {
-            AudioSample loaded = AudioSample.load(path);
-            Spectrogram spec = Spectrogram.compute(loaded, FFT_SIZE, HOP);
-            return new LoadResult(loaded, spec);
-          }
-        };
-    task.setOnSucceeded(
-        e -> {
-          LoadResult result = task.getValue();
-          this.sample = result.sample();
-          this.sonoScale = sonoScaleFor(result.sample());
-          this.spectrogramImage = buildSpectrogramImage(result.spectrogram());
-          // Cale par défaut la vue fréquentielle sur la bande réellement utilisée par le signal.
-          frequencyZoom.set(autoFrequencyZoom(result.spectrogram()));
-          try {
-            player.load(path);
-          } catch (Exception ignored) {
-            // La lecture audio est optionnelle : l'affichage reste fonctionnel sans son.
-          }
-          duration.set(sample.durationSeconds());
-          currentTime.set(0);
-          redraw();
-        });
-    task.setOnFailed(e -> redraw());
-
-    Thread worker = new Thread(task, "audio-view-loader");
-    worker.setDaemon(true);
-    worker.start();
+  @FXML
+  private void onZoomTimeIn() {
+    vm.timeZoomProperty().set(Math.min(64, vm.timeZoomProperty().get() * 2));
   }
 
-  private record LoadResult(AudioSample sample, Spectrogram spectrogram) {}
+  @FXML
+  private void onZoomTimeOut() {
+    vm.timeZoomProperty().set(Math.max(1, vm.timeZoomProperty().get() / 2));
+  }
 
-  private WritableImage buildSpectrogramImage(Spectrogram spec) {
-    int w = Math.max(1, spec.frameCount());
-    int h = Math.max(1, spec.binCount());
-    WritableImage img = new WritableImage(w, h);
-    PixelWriter pw = img.getPixelWriter();
-    for (int x = 0; x < spec.frameCount(); x++) {
-      for (int y = 0; y < h; y++) {
-        int bin = h - 1 - y; // basses fréquences en bas
-        double db = spec.magnitudeDb(x, bin);
-        double norm = (db - MIN_DB) / (MAX_DB - MIN_DB);
-        norm = Math.max(0, Math.min(1, norm));
-        pw.setColor(x, y, colormap(norm));
-      }
-    }
-    return img;
+  @FXML
+  private void onZoomFreqIn() {
+    vm.frequencyZoomProperty().set(Math.min(64, vm.frequencyZoomProperty().get() * 2));
+  }
+
+  @FXML
+  private void onZoomFreqOut() {
+    vm.frequencyZoomProperty().set(Math.max(1, vm.frequencyZoomProperty().get() / 2));
   }
 
   // ----- Rendu -----
 
-  private void redraw() {
+  private void refresh() {
     drawSonogram();
-    drawSpectrogram();
+    updateSpectrogram();
+    updateAxes();
+    updateCursors();
   }
 
-  private double windowDuration() {
-    double dur = duration.get();
-    return dur <= 0 ? 0 : dur / Math.max(1, timeZoom.get());
-  }
-
-  private double windowStart() {
-    double dur = duration.get();
-    double win = windowDuration();
-    if (win <= 0) {
-      return 0;
-    }
-    double start = currentTime.get() - win / 2;
-    return Math.max(0, Math.min(dur - win, start));
-  }
-
+  /** Enveloppe min/max de l'onde par colonne, tracée sur Canvas (le curseur est un nœud). */
   private void drawSonogram() {
     GraphicsContext g = sonoCanvas.getGraphicsContext2D();
     double w = sonoCanvas.getWidth();
     double h = sonoCanvas.getHeight();
-    g.setFill(AXIS_BG);
-    g.fillRect(0, 0, w, h);
+    // Fond transparent : il provient de la CSS (.audio-view-plot-area), on n'efface que le tracé.
+    g.clearRect(0, 0, w, h);
     double plotX = AXIS_LEFT;
     double plotW = w - AXIS_LEFT;
+    AudioSample sample = vm.getSample();
     if (sample == null || plotW < 1 || h < 1) {
       return;
     }
 
     float[] x = sample.samples();
     float sr = sample.sampleRate();
-    double win = windowDuration();
-    double start = windowStart();
+    double win = vm.windowDuration();
+    double start = vm.windowStart();
+    double sonoScale = vm.getSonoScale();
     int s0 = (int) Math.floor(start * sr);
     int s1 = (int) Math.ceil((start + win) * sr);
     s0 = Math.max(0, Math.min(x.length, s0));
     s1 = Math.max(s0 + 1, Math.min(x.length, s1));
     double mid = h / 2.0;
 
-    g.setStroke(Color.web("#7fd4ff"));
+    g.setStroke(waveColor.get());
     g.setLineWidth(1);
     int cols = (int) plotW;
     double samplesPerCol = (s1 - s0) / (double) cols;
@@ -348,107 +286,162 @@ public class AudioView extends Region {
       }
       g.strokeLine(plotX + c, mid - max * sonoScale * mid, plotX + c, mid - min * sonoScale * mid);
     }
-    drawCursor(g, plotX, plotW, h, start, win);
   }
 
-  /**
-   * Auto-échelle verticale du sonogramme : facteur tel que le pic du fichier remplisse ~95% de la
-   * demi-hauteur. Les enregistrements de chiroptères étant de faible amplitude, sans cela la forme
-   * d'onde resterait minuscule. Plafonné pour ne pas amplifier démesurément un fichier quasi muet.
-   */
-  private static double sonoScaleFor(AudioSample s) {
-    float peak = 0;
-    for (float v : s.samples()) {
-      float a = Math.abs(v);
-      if (a > peak) {
-        peak = a;
-      }
-    }
-    return peak > 1e-6f ? Math.min(0.95 / peak, 100.0) : 1.0;
-  }
-
-  /**
-   * Zoom fréquentiel par défaut calé sur la bande réellement utilisée : on cherche la fréquence la
-   * plus haute dont l'énergie dépasse un seuil sous le pic, puis on cadre {@code [0, fMax]} avec
-   * une marge. Évite d'afficher une grande zone vide en haut du spectrogramme.
-   */
-  private static double autoFrequencyZoom(Spectrogram spec) {
-    int bins = spec.binCount();
-    int frames = spec.frameCount();
-    if (bins < 2 || frames < 1) {
-      return 1;
-    }
-    double globalMax = -Double.MAX_VALUE;
-    double[] binMax = new double[bins];
-    for (int b = 0; b < bins; b++) {
-      double m = -Double.MAX_VALUE;
-      for (int f = 0; f < frames; f++) {
-        m = Math.max(m, spec.magnitudeDb(f, b));
-      }
-      binMax[b] = m;
-      globalMax = Math.max(globalMax, m);
-    }
-    double seuil = globalMax - 35.0; // dB sous le pic
-    int plusHaut = 0;
-    for (int b = 0; b < bins; b++) {
-      if (binMax[b] >= seuil) {
-        plusHaut = b;
-      }
-    }
-    // Fraction de la bande de Nyquist occupée, avec 30 % de marge au-dessus du dernier cri.
-    double fraction = Math.min(1.0, ((plusHaut + 1) / (double) (bins - 1)) * 1.3);
-    if (fraction <= 0) {
-      return 1;
-    }
-    return Math.max(1, Math.min(64, 1.0 / fraction));
-  }
-
-  private void drawSpectrogram() {
-    GraphicsContext g = spectroCanvas.getGraphicsContext2D();
-    double w = spectroCanvas.getWidth();
-    double h = spectroCanvas.getHeight();
-    g.setFill(AXIS_BG);
-    g.fillRect(0, 0, w, h);
-    double plotX = AXIS_LEFT;
-    double plotW = w - AXIS_LEFT;
-    double plotH = h - AXIS_BOTTOM;
-    if (spectrogramImage == null || sample == null || plotW < 1 || plotH < 1) {
+  /** Recadre l'image du spectrogramme (fenêtre temps + tranche basse de fréquence) via viewport. */
+  private void updateSpectrogram() {
+    WritableImage img = vm.getSpectrogramImage();
+    AudioSample sample = vm.getSample();
+    if (img == null || sample == null) {
+      spectroImage.setImage(null);
       return;
     }
+    spectroImage.setImage(img);
 
-    double dur = duration.get();
-    double win = windowDuration();
-    double start = windowStart();
-    double imgW = spectrogramImage.getWidth();
-    double imgH = spectrogramImage.getHeight();
+    double dur = vm.getDuration();
+    double win = vm.windowDuration();
+    double start = vm.windowStart();
+    double imgW = img.getWidth();
+    double imgH = img.getHeight();
 
     double sx = dur <= 0 ? 0 : (start / dur) * imgW;
     double sw = dur <= 0 ? imgW : (win / dur) * imgW;
 
-    // Zoom fréquence : on n'affiche que la tranche basse (0 .. fMax / zoom),
-    // située en bas de l'image.
-    double fz = Math.max(1, frequencyZoom.get());
+    // Zoom fréquence : on n'affiche que la tranche basse (0 .. fMax / zoom), en bas de l'image.
+    double fz = Math.max(1, vm.getFrequencyZoom());
     double visibleH = imgH / fz;
     double sy = imgH - visibleH;
 
-    g.setImageSmoothing(false);
-    g.drawImage(
-        spectrogramImage, sx, sy, Math.max(1, sw), Math.max(1, visibleH), plotX, 0, plotW, plotH);
-
-    // Fréquence max visible dans le fichier (Hz), avant application du facteur d'expansion.
-    double fMaxFileVisible = (sample.sampleRate() / 2.0) / fz;
-    drawFrequencyAxis(g, plotX, plotW, plotH, fMaxFileVisible);
-    drawTimeAxis(g, plotX, plotW, plotH, start, win);
-    drawCursor(g, plotX, plotW, plotH, start, win);
+    spectroImage.setViewport(new Rectangle2D(sx, sy, Math.max(1, sw), Math.max(1, visibleH)));
   }
 
   /**
-   * Construit la légende des couleurs (intensité en dB) comme un assemblage de noeuds : fond
-   * arrondi semi-transparent, bande dégradée reprenant la colormap, libellés dB. Étant de vrais
-   * noeuds, elle se rend correctement en HiDPI et son placement est géré par le layout (pas de
-   * dessin Canvas).
+   * Régénère les graduations (fréquence à gauche, temps en bas) en nœuds dans {@code axisLayer}.
    */
-  private Pane buildColorbarLegend() {
+  private void updateAxes() {
+    axisLayer.getChildren().clear();
+    AudioSample sample = vm.getSample();
+    double plotW = spectroHost.getWidth() - AXIS_LEFT;
+    double plotH = spectroHost.getHeight() - AXIS_BOTTOM;
+    if (sample == null || plotW < 1 || plotH < 1) {
+      return;
+    }
+    double fz = Math.max(1, vm.getFrequencyZoom());
+    double fMaxFileVisible = (sample.sampleRate() / 2.0) / fz;
+    addFrequencyAxis(plotW, plotH, fMaxFileVisible);
+    addTimeAxis(plotW, plotH, vm.windowStart(), vm.windowDuration());
+  }
+
+  /** Graduations de fréquence (gouttière gauche), en kHz, mises à l'échelle par le facteur. */
+  private void addFrequencyAxis(double plotW, double plotH, double fMaxFileVisibleHz) {
+    double fMaxHz = fMaxFileVisibleHz * vm.expansionFactor();
+    if (fMaxHz <= 0) {
+      return;
+    }
+    double stepHz = AudioViewModel.niceStep(fMaxHz, 5);
+    int nTicks = (int) Math.floor(fMaxHz / stepHz);
+    for (int i = 0; i <= nTicks; i++) {
+      double f = i * stepHz;
+      double y = plotH * (1 - f / fMaxHz);
+      axisLayer.getChildren().add(gridLine(AXIS_LEFT, y, AXIS_LEFT + plotW, y));
+      axisLayer.getChildren().add(tickLine(AXIS_LEFT - 4, y, AXIS_LEFT, y));
+      Label lbl = axisLabel(AudioViewModel.formatAxis(f / 1000.0, stepHz / 1000.0));
+      lbl.setPrefSize(AXIS_LEFT - 8, 14);
+      lbl.setAlignment(Pos.CENTER_RIGHT);
+      lbl.setLayoutX(2);
+      lbl.setLayoutY(clamp(y - 7, 0, plotH - 14));
+      axisLayer.getChildren().add(lbl);
+    }
+    Label unit = axisLabel("kHz");
+    unit.setLayoutX(2);
+    unit.setLayoutY(0);
+    axisLayer.getChildren().add(unit);
+  }
+
+  /** Graduations de temps (gouttière basse), en secondes, mises à l'échelle par le facteur. */
+  private void addTimeAxis(double plotW, double plotH, double start, double win) {
+    if (win <= 0) {
+      return;
+    }
+    double factor = vm.expansionFactor();
+    double t0 = start / factor;
+    double t1 = (start + win) / factor;
+    double range = t1 - t0;
+    double step = AudioViewModel.niceStep(range, 6);
+    int firstIndex = (int) Math.ceil(t0 / step);
+    int lastIndex = (int) Math.floor(t1 / step);
+    for (int i = firstIndex; i <= lastIndex; i++) {
+      double t = i * step;
+      double x = AXIS_LEFT + plotW * ((t - t0) / range);
+      axisLayer.getChildren().add(gridLine(x, 0, x, plotH));
+      axisLayer.getChildren().add(tickLine(x, plotH, x, plotH + 4));
+      Label lbl = axisLabel(AudioViewModel.formatAxis(t, step));
+      lbl.setPrefWidth(40);
+      lbl.setAlignment(Pos.CENTER);
+      lbl.setLayoutX(clamp(x - 20, AXIS_LEFT, AXIS_LEFT + plotW - 40));
+      lbl.setLayoutY(plotH + 5);
+      axisLayer.getChildren().add(lbl);
+    }
+    Label unit = axisLabel("s");
+    unit.setPrefWidth(20);
+    unit.setAlignment(Pos.CENTER_RIGHT);
+    unit.setLayoutX(AXIS_LEFT + plotW - 20);
+    unit.setLayoutY(plotH + 5);
+    axisLayer.getChildren().add(unit);
+  }
+
+  /** Repositionne les deux curseurs (sonogramme et spectrogramme) selon le temps courant. */
+  private void updateCursors() {
+    double win = vm.windowDuration();
+    double start = vm.windowStart();
+    double rel = win <= 0 ? -1 : (vm.getCurrentTime() - start) / win;
+    boolean show = rel >= 0 && rel <= 1;
+    double sonoPlotW = sonoCanvas.getWidth() - AXIS_LEFT;
+    positionCursor(sonoCursor, show, AXIS_LEFT + rel * sonoPlotW, 0, sonoCanvas.getHeight());
+    double spectroPlotW = spectroHost.getWidth() - AXIS_LEFT;
+    double spectroPlotH = spectroHost.getHeight() - AXIS_BOTTOM;
+    positionCursor(spectroCursor, show, AXIS_LEFT + rel * spectroPlotW, 0, spectroPlotH);
+  }
+
+  private static void positionCursor(Line line, boolean show, double x, double y0, double y1) {
+    line.setVisible(show);
+    if (show) {
+      line.setStartX(x);
+      line.setEndX(x);
+      line.setStartY(y0);
+      line.setEndY(y1);
+    }
+  }
+
+  private static Line gridLine(double x1, double y1, double x2, double y2) {
+    Line line = new Line(x1, y1, x2, y2);
+    line.getStyleClass().add("audio-view-grid");
+    line.setManaged(false);
+    line.setMouseTransparent(true);
+    return line;
+  }
+
+  private static Line tickLine(double x1, double y1, double x2, double y2) {
+    Line line = new Line(x1, y1, x2, y2);
+    line.getStyleClass().add("audio-view-tick");
+    line.setManaged(false);
+    line.setMouseTransparent(true);
+    return line;
+  }
+
+  private static Label axisLabel(String text) {
+    Label label = new Label(text);
+    label.getStyleClass().add("audio-view-axis-label");
+    label.setMouseTransparent(true);
+    return label;
+  }
+
+  private static double clamp(double value, double lo, double hi) {
+    return Math.max(lo, Math.min(hi, value));
+  }
+
+  /** Remplit la légende des couleurs (intensité en dB) : fond, bande dégradée, libellés dB. */
+  private void buildColorbarLegend() {
     double w = 56;
     double barH = 150;
     double headerH = 14;
@@ -456,213 +449,70 @@ public class AudioView extends Region {
     double stripX = w - stripW - 6;
     double stripTop = headerH;
 
-    Pane legende = new Pane();
-    legende.setMouseTransparent(true);
-    legende.setPrefSize(w, headerH + barH + 8);
-    legende.setMaxSize(w, headerH + barH + 8);
-    legende.setStyle("-fx-background-color: rgba(11,15,20,0.6); -fx-background-radius: 6;");
+    legend.setPrefSize(w, headerH + barH + 8);
+    legend.setMaxSize(w, headerH + barH + 8);
 
     Label entete = new Label("dB");
-    entete.setFont(AXIS_FONT);
-    entete.setTextFill(AXIS_TEXT);
     entete.setLayoutX(6);
     entete.setLayoutY(0);
-    legende.getChildren().add(entete);
+    legend.getChildren().add(entete);
 
     Rectangle bande = new Rectangle(stripX, stripTop, stripW, barH);
-    bande.setFill(COLORBAR_GRADIENT);
+    bande.setFill(buildColorbarGradient(isLightTheme()));
     bande.setStroke(AXIS_TEXT);
     bande.setStrokeWidth(1);
-    legende.getChildren().add(bande);
+    legend.getChildren().add(bande);
+    colorbarBande = bande;
 
-    double range = MAX_DB - MIN_DB;
-    double step = niceStep(range, 4);
+    double range = AudioViewModel.MAX_DB - AudioViewModel.MIN_DB;
+    double step = AudioViewModel.niceStep(range, 4);
     int nTicks = (int) Math.round(range / step);
     for (int i = 0; i <= nTicks; i++) {
-      double db = MIN_DB + i * step;
-      double y = stripTop + barH * (1 - (db - MIN_DB) / range);
-      Label valeur = new Label(formatAxis(db, step));
-      valeur.setFont(AXIS_FONT);
-      valeur.setTextFill(AXIS_TEXT);
+      double db = AudioViewModel.MIN_DB + i * step;
+      double y = stripTop + barH * (1 - (db - AudioViewModel.MIN_DB) / range);
+      Label valeur = new Label(AudioViewModel.formatAxis(db, step));
       valeur.setLayoutX(2);
       valeur.setLayoutY(y - 8);
       valeur.setPrefWidth(stripX - 6);
       valeur.setAlignment(Pos.CENTER_RIGHT);
-      legende.getChildren().add(valeur);
+      legend.getChildren().add(valeur);
     }
-    return legende;
   }
 
-  /** Dégradé reproduisant la colormap du spectrogramme (haut = intensité max). */
-  private static LinearGradient buildColorbarGradient() {
+  /**
+   * Dégradé reproduisant la colormap du spectrogramme (haut = intensité max) pour le thème actif.
+   */
+  private static LinearGradient buildColorbarGradient(boolean light) {
     int n = 16;
     Stop[] stops = new Stop[n + 1];
     for (int i = 0; i <= n; i++) {
       double offset = i / (double) n;
-      stops[i] = new Stop(offset, colormap(1 - offset));
+      stops[i] = new Stop(offset, AudioViewModel.colormap(1 - offset, light));
     }
     return new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE, stops);
   }
 
-  private void drawCursor(
-      GraphicsContext g, double plotX, double plotW, double plotH, double start, double win) {
-    if (win <= 0) {
-      return;
-    }
-    double rel = (currentTime.get() - start) / win;
-    if (rel < 0 || rel > 1) {
-      return;
-    }
-    g.setStroke(Color.web("#ff5252"));
-    g.setLineWidth(1.5);
-    double cx = plotX + rel * plotW;
-    g.strokeLine(cx, 0, cx, plotH);
-  }
-
-  /** Graduations de fréquence (gouttière gauche), en kHz, mises à l'échelle par le facteur. */
-  private void drawFrequencyAxis(
-      GraphicsContext g, double plotX, double plotW, double plotH, double fMaxFileVisibleHz) {
-    double fMaxHz = fMaxFileVisibleHz * expansionFactor();
-    if (fMaxHz <= 0) {
-      return;
-    }
-    g.setFont(AXIS_FONT);
-    g.setTextBaseline(VPos.CENTER);
-    double stepHz = niceStep(fMaxHz, 5);
-    int nTicks = (int) Math.floor(fMaxHz / stepHz);
-    for (int i = 0; i <= nTicks; i++) {
-      double f = i * stepHz;
-      double y = plotH * (1 - f / fMaxHz);
-      g.setStroke(AXIS_GRID);
-      g.setLineWidth(1);
-      g.strokeLine(plotX, y, plotX + plotW, y);
-      g.setStroke(AXIS_TEXT);
-      g.strokeLine(plotX - 4, y, plotX, y);
-      g.setFill(AXIS_TEXT);
-      g.setTextAlign(TextAlignment.RIGHT);
-      double ty = Math.max(7, Math.min(plotH - 2, y));
-      g.fillText(formatAxis(f / 1000.0, stepHz / 1000.0), plotX - 6, ty);
-    }
-    g.setFill(AXIS_TEXT);
-    g.setTextAlign(TextAlignment.LEFT);
-    g.setTextBaseline(VPos.TOP);
-    g.fillText("kHz", 2, 1);
-  }
-
-  /** Graduations de temps (gouttière basse), en secondes, mises à l'échelle par le facteur. */
-  private void drawTimeAxis(
-      GraphicsContext g, double plotX, double plotW, double plotH, double start, double win) {
-    if (win <= 0) {
-      return;
-    }
-    double factor = expansionFactor();
-    double t0 = start / factor;
-    double t1 = (start + win) / factor;
-    double range = t1 - t0;
-    double step = niceStep(range, 6);
-    g.setFont(AXIS_FONT);
-    g.setTextBaseline(VPos.TOP);
-    g.setTextAlign(TextAlignment.CENTER);
-    int firstIndex = (int) Math.ceil(t0 / step);
-    int lastIndex = (int) Math.floor(t1 / step);
-    for (int i = firstIndex; i <= lastIndex; i++) {
-      double t = i * step;
-      double x = plotX + plotW * ((t - t0) / range);
-      g.setStroke(AXIS_GRID);
-      g.setLineWidth(1);
-      g.strokeLine(x, 0, x, plotH);
-      g.setStroke(AXIS_TEXT);
-      g.strokeLine(x, plotH, x, plotH + 4);
-      g.setFill(AXIS_TEXT);
-      double tx = Math.max(plotX + 10, Math.min(plotX + plotW - 10, x));
-      g.fillText(formatAxis(t, step), tx, plotH + 5);
-    }
-    g.setFill(AXIS_TEXT);
-    g.setTextAlign(TextAlignment.RIGHT);
-    g.fillText("s", plotX + plotW, plotH + 5);
-  }
-
-  private double expansionFactor() {
-    double f = timeExpansion.get();
-    return f > 0 ? f : 1;
-  }
-
-  /** Pas de graduation « rond » (1, 2, 5 × 10^k) couvrant range avec ~target intervalles. */
-  private static double niceStep(double range, int target) {
-    if (range <= 0 || target <= 0) {
-      return 1;
-    }
-    double raw = range / target;
-    double mag = Math.pow(10, Math.floor(Math.log10(raw)));
-    double norm = raw / mag;
-    double step;
-    if (norm < 1.5) {
-      step = 1;
-    } else if (norm < 3) {
-      step = 2;
-    } else if (norm < 7) {
-      step = 5;
-    } else {
-      step = 10;
-    }
-    return step * mag;
-  }
-
-  private static String formatAxis(double value, double step) {
-    int decimals = step >= 1 ? 0 : (int) Math.min(3, Math.ceil(-Math.log10(step)));
-    return String.format("%." + decimals + "f", value);
-  }
-
-  private void seekFromX(double mouseX, double canvasWidth) {
-    double plotW = canvasWidth - AXIS_LEFT;
-    if (duration.get() <= 0 || plotW <= 0) {
+  private void seekFromX(double mouseX, double hostWidth) {
+    double plotW = hostWidth - AXIS_LEFT;
+    if (vm.getDuration() <= 0 || plotW <= 0) {
       return;
     }
     double rel = Math.max(0, Math.min(1, (mouseX - AXIS_LEFT) / plotW));
-    double win = windowDuration();
-    double start = windowStart();
-    double t = Math.max(0, Math.min(duration.get(), start + rel * win));
-    player.seek(t);
-    currentTime.set(t);
+    vm.seek(vm.windowStart() + rel * vm.windowDuration());
   }
 
-  private void updateTimeLabel() {
-    double f = expansionFactor();
-    timeLabel.setText(String.format("%.2f / %.2f s", currentTime.get() / f, duration.get() / f));
-  }
-
-  private static Color colormap(double t) {
-    double[][] stops = {
-      {0.00, 0.00, 0.00, 0.00},
-      {0.35, 0.20, 0.05, 0.45},
-      {0.70, 0.85, 0.15, 0.35},
-      {1.00, 1.00, 0.95, 0.30}
-    };
-    for (int i = 1; i < stops.length; i++) {
-      if (t <= stops[i][0]) {
-        double[] lo = stops[i - 1];
-        double[] hi = stops[i];
-        double f = (t - lo[0]) / (hi[0] - lo[0]);
-        return Color.color(
-            lo[1] + f * (hi[1] - lo[1]), lo[2] + f * (hi[2] - lo[2]), lo[3] + f * (hi[3] - lo[3]));
-      }
-    }
-    double[] last = stops[stops.length - 1];
-    return Color.color(last[1], last[2], last[3]);
-  }
-
-  // ----- Accès aux propriétés -----
+  // ----- API publique (déléguée au ViewModel) -----
 
   public final ObjectProperty<Path> audioFileProperty() {
-    return audioFile;
+    return vm.audioFileProperty();
   }
 
   public final Path getAudioFile() {
-    return audioFile.get();
+    return vm.audioFileProperty().get();
   }
 
   public final void setAudioFile(Path path) {
-    audioFile.set(path);
+    vm.audioFileProperty().set(path);
   }
 
   /** Pratique pour le FXML : règle la source à partir d'un chemin sous forme de chaîne. */
@@ -671,67 +521,67 @@ public class AudioView extends Region {
   }
 
   public final BooleanProperty playingProperty() {
-    return playing;
+    return vm.playingProperty();
   }
 
   public final boolean isPlaying() {
-    return playing.get();
+    return vm.playingProperty().get();
   }
 
   public final void setPlaying(boolean value) {
-    playing.set(value);
+    vm.playingProperty().set(value);
   }
 
   public final void togglePlay() {
-    setPlaying(!isPlaying());
+    vm.togglePlay();
   }
 
   public final ReadOnlyDoubleProperty currentTimeProperty() {
-    return currentTime.getReadOnlyProperty();
+    return vm.currentTimeProperty();
   }
 
   public final double getCurrentTime() {
-    return currentTime.get();
+    return vm.getCurrentTime();
   }
 
   public final ReadOnlyDoubleProperty durationProperty() {
-    return duration.getReadOnlyProperty();
+    return vm.durationProperty();
   }
 
   public final double getDuration() {
-    return duration.get();
+    return vm.getDuration();
   }
 
   public final DoubleProperty timeZoomProperty() {
-    return timeZoom;
+    return vm.timeZoomProperty();
   }
 
   public final double getTimeZoom() {
-    return timeZoom.get();
+    return vm.timeZoomProperty().get();
   }
 
   public final void setTimeZoom(double value) {
-    timeZoom.set(Math.max(1, value));
+    vm.timeZoomProperty().set(Math.max(1, value));
   }
 
   public final DoubleProperty frequencyZoomProperty() {
-    return frequencyZoom;
+    return vm.frequencyZoomProperty();
   }
 
   public final double getFrequencyZoom() {
-    return frequencyZoom.get();
+    return vm.getFrequencyZoom();
   }
 
   public final void setFrequencyZoom(double value) {
-    frequencyZoom.set(Math.max(1, value));
+    vm.frequencyZoomProperty().set(Math.max(1, value));
   }
 
   public final DoubleProperty timeExpansionFactorProperty() {
-    return timeExpansion;
+    return vm.timeExpansionFactorProperty();
   }
 
   public final double getTimeExpansionFactor() {
-    return timeExpansion.get();
+    return vm.timeExpansionFactorProperty().get();
   }
 
   /**
@@ -743,12 +593,70 @@ public class AudioView extends Region {
    * lecture).
    */
   public final void setTimeExpansionFactor(double value) {
-    timeExpansion.set(value > 0 ? value : 1);
+    vm.timeExpansionFactorProperty().set(value > 0 ? value : 1);
+  }
+
+  public final BooleanProperty lightThemeProperty() {
+    return lightTheme;
+  }
+
+  public final boolean isLightTheme() {
+    return lightTheme.get();
+  }
+
+  /** Active (vrai) ou désactive (faux, défaut) le thème clair. */
+  public final void setLightTheme(boolean value) {
+    lightTheme.set(value);
+  }
+
+  private void applyTheme(boolean light) {
+    pseudoClassStateChanged(LIGHT_THEME, light);
+    vm.setLightColormap(light);
+    if (colorbarBande != null) {
+      colorbarBande.setFill(buildColorbarGradient(light));
+    }
   }
 
   /** Libère le périphérique audio. À appeler quand le composant n'est plus utilisé. */
   public void dispose() {
-    timer.stop();
-    player.close();
+    vm.dispose();
+  }
+
+  // ----- Métadonnées CSS (propriétés stylables) -----
+
+  private static final class StyleableProperties {
+    private static final CssMetaData<AudioView, Color> WAVE_COLOR =
+        new CssMetaData<>("-fx-wave-color", ColorConverter.getInstance(), WAVE_COLOR_DEFAULT) {
+          @Override
+          public boolean isSettable(AudioView node) {
+            return !node.waveColor.isBound();
+          }
+
+          @Override
+          public StyleableProperty<Color> getStyleableProperty(AudioView node) {
+            return node.waveColor;
+          }
+        };
+
+    private static final List<CssMetaData<? extends Styleable, ?>> CSS_META_DATA;
+
+    static {
+      List<CssMetaData<? extends Styleable, ?>> list =
+          new ArrayList<>(BorderPane.getClassCssMetaData());
+      list.add(WAVE_COLOR);
+      CSS_META_DATA = Collections.unmodifiableList(list);
+    }
+
+    private StyleableProperties() {}
+  }
+
+  /** Métadonnées CSS de la classe (héritées de BorderPane + {@code -fx-wave-color}). */
+  public static List<CssMetaData<? extends Styleable, ?>> getClassCssMetaData() {
+    return StyleableProperties.CSS_META_DATA;
+  }
+
+  @Override
+  public List<CssMetaData<? extends Styleable, ?>> getCssMetaData() {
+    return StyleableProperties.CSS_META_DATA;
   }
 }
