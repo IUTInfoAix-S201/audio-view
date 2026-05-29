@@ -7,7 +7,7 @@
     [
       "@semantic-release/exec",
       {
-        "publishCmd": "curl -sSf -m 600 -o /dev/null https://jitpack.io/com/github/IUTInfoAix-S201/audio-view/v${nextRelease.version}/audio-view-v${nextRelease.version}.pom"
+        "publishCmd": "for i in $(seq 1 30); do curl -sf -m 30 -o /dev/null https://jitpack.io/com/github/IUTInfoAix-S201/audio-view/v${nextRelease.version}/audio-view-v${nextRelease.version}.pom && exit 0; sleep 20; done; echo JitPack n a pas servi v${nextRelease.version} apres ~10 min; exit 1"
       }
     ]
   ]
