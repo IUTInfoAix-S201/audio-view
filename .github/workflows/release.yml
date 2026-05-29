@@ -2,7 +2,14 @@
 # Sur push sur main : analyse les commits depuis le dernier tag, calcule la version
 # (feat -> minor, fix -> patch, BREAKING -> major), crée le tag vX.Y.Z + la release
 # GitHub (avec notes de version) en UN seul run, avec le GITHUB_TOKEN (pas de PAT,
-# pas de PR). JitPack construit ensuite ce tag à la demande (la version EST le tag).
+# pas de PR).
+#
+# Smoke-test + préchauffage JitPack : le plugin @semantic-release/exec (étape publish,
+# en dernier dans .releaserc.json) curl l'artefact JitPack du tag fraîchement créé. Si
+# JitPack n'arrive pas à builder le tag, le run vire au rouge ICI (au lieu qu'un étudiant
+# tombe sur un 404 plus tard) et le cache est chaud pour le premier vrai consommateur.
+# On le fait dans CE job (pas via un workflow "on: push: tags") car un tag créé par le
+# GITHUB_TOKEN ne déclenche pas d'autre workflow.
 #
 # Config minimale (.releaserc.json) : pas de commit de CHANGELOG sur main (les notes
 # vivent dans la release GitHub), donc aucun commit parasite.
@@ -33,4 +40,4 @@ jobs:
       - name: semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx --yes semantic-release
+        run: npx --yes -p semantic-release -p @semantic-release/exec semantic-release
