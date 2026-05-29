@@ -1,4 +1,4 @@
-package fr.iutaix.vigiechiro.audio;
+package fr.nedjar.vigiechiro.audio;
 
 import java.nio.file.Path;
 import javafx.animation.AnimationTimer;

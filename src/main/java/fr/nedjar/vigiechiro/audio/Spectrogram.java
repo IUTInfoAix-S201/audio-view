@@ -1,4 +1,4 @@
-package fr.iutaix.vigiechiro.audio;
+package fr.nedjar.vigiechiro.audio;
 
 /**
  * Transformée de Fourier à court terme (STFT) produisant une matrice de magnitudes en décibels,

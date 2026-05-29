@@ -4,7 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>fr.iutaix.vigiechiro</groupId>
+  <groupId>fr.nedjar.vigiechiro</groupId>
   <artifactId>audio-view</artifactId>
   <version>1.1.0</version>
   <packaging>jar</packaging>
@@ -287,9 +287,9 @@
                 <rule>
                   <element>CLASS</element>
                   <includes>
-                    <include>fr.iutaix.vigiechiro.audio.Fft</include>
-                    <include>fr.iutaix.vigiechiro.audio.Spectrogram</include>
-                    <include>fr.iutaix.vigiechiro.audio.AudioSample</include>
+                    <include>fr.nedjar.vigiechiro.audio.Fft</include>
+                    <include>fr.nedjar.vigiechiro.audio.Spectrogram</include>
+                    <include>fr.nedjar.vigiechiro.audio.AudioSample</include>
                   </includes>
                   <limits>
                     <limit>
@@ -321,14 +321,14 @@
         </dependencies>
         <configuration>
           <targetClasses>
-            <param>fr.iutaix.vigiechiro.audio.Fft</param>
-            <param>fr.iutaix.vigiechiro.audio.Spectrogram</param>
-            <param>fr.iutaix.vigiechiro.audio.AudioSample</param>
+            <param>fr.nedjar.vigiechiro.audio.Fft</param>
+            <param>fr.nedjar.vigiechiro.audio.Spectrogram</param>
+            <param>fr.nedjar.vigiechiro.audio.AudioSample</param>
           </targetClasses>
           <targetTests>
-            <param>fr.iutaix.vigiechiro.audio.FftTest</param>
-            <param>fr.iutaix.vigiechiro.audio.SpectrogramTest</param>
-            <param>fr.iutaix.vigiechiro.audio.AudioSampleTest</param>
+            <param>fr.nedjar.vigiechiro.audio.FftTest</param>
+            <param>fr.nedjar.vigiechiro.audio.SpectrogramTest</param>
+            <param>fr.nedjar.vigiechiro.audio.AudioSampleTest</param>
           </targetTests>
         </configuration>
       </plugin>

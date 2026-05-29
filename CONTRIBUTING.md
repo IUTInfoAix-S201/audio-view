@@ -14,7 +14,7 @@ Voir aussi [TESTING.md](TESTING.md) pour tout ce qui touche aux tests.
 
 ## Architecture (MVVM + fx:root + FXML + CSS)
 
-Package unique `fr.iutaix.vigiechiro.audio`, aligné sur ce que les étudiants voient en R2.02 (FXML en
+Package unique `fr.nedjar.vigiechiro.audio`, aligné sur ce que les étudiants voient en R2.02 (FXML en
 TP3, MVVM en TP4) :
 
 | Élément | Rôle |

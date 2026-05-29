@@ -1,4 +1,4 @@
-package fr.iutaix.vigiechiro.audio;
+package fr.nedjar.vigiechiro.audio;
 
 import java.io.IOException;
 import java.nio.file.Path;

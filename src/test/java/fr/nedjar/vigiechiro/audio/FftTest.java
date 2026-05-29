@@ -1,4 +1,4 @@
-package fr.iutaix.vigiechiro.audio;
+package fr.nedjar.vigiechiro.audio;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

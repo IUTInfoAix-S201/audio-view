@@ -4,7 +4,7 @@
        c'est l'idiome JavaFX (le consommateur s'y abonne / la lie). EI_EXPOSE_REP n'est
        donc pas pertinent ici, ce n'est pas une fuite de représentation. -->
   <Match>
-    <Class name="fr.iutaix.vigiechiro.audio.AudioView"/>
+    <Class name="fr.nedjar.vigiechiro.audio.AudioView"/>
     <Method name="~.*Property"/>
     <Bug pattern="EI_EXPOSE_REP"/>
   </Match>
@@ -12,14 +12,14 @@
        lever IOException, relayée en IllegalStateException). Le throw n'est atteint que si le FXML
        embarqué manque/est corrompu (erreur de build), pas un vecteur d'attaque par finaliseur. -->
   <Match>
-    <Class name="fr.iutaix.vigiechiro.audio.AudioView"/>
+    <Class name="fr.nedjar.vigiechiro.audio.AudioView"/>
     <Method name="&lt;init&gt;"/>
     <Bug pattern="CT_CONSTRUCTOR_THROW"/>
   </Match>
   <!-- getClassCssMetaData() static est l'idiome JavaFX imposé pour exposer les CssMetaData d'un
        composant stylable : il « masque » volontairement celui de Node/Region (API attendue). -->
   <Match>
-    <Class name="fr.iutaix.vigiechiro.audio.AudioView"/>
+    <Class name="fr.nedjar.vigiechiro.audio.AudioView"/>
     <Method name="getClassCssMetaData"/>
     <Bug pattern="HSM_HIDING_METHOD"/>
   </Match>

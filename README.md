@@ -68,7 +68,7 @@ view.setPlaying(true); // ou view.togglePlay();
 Le composant a un constructeur sans argument, il s'insère donc directement :
 
 ```xml
-<?import fr.iutaix.vigiechiro.audio.AudioView?>
+<?import fr.nedjar.vigiechiro.audio.AudioView?>
 
 <AudioView fx:id="audioView" VBox.vgrow="ALWAYS"/>
 ```
@@ -155,7 +155,7 @@ Conventions de contribution (architecture, code, commits, qualité, release) :
 - **Architecture MVVM** : la logique (décodage/FFT, lecture, fenêtres, auto-échelles) vit dans un
   ViewModel sans dépendance au graphe de scène (donc testable sans interface) ; `AudioView` est la
   vue, un custom control **`fx:root`** (`AudioView.fxml`) stylé par **`audio-view.css`**.
-- **Artefact modulaire** (`module-info.java`) exportant uniquement `fr.iutaix.vigiechiro.audio` (et
+- **Artefact modulaire** (`module-info.java`) exportant uniquement `fr.nedjar.vigiechiro.audio` (et
   l'ouvrant à `javafx.fxml`) : le décodage, la FFT et la lecture restent une boîte noire.
 - **Lecture** via `javax.sound.sampled` (`Clip`) pilotée par un `AnimationTimer`, pour un curseur
   synchronisé au plus près. Les WAV transformés étant déjà ralentis x10 (signal dans la bande

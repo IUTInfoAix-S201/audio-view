@@ -1,4 +1,4 @@
-package fr.iutaix.vigiechiro.audio;
+package fr.nedjar.vigiechiro.audio;
 
 /**
  * FFT complexe en place, itérative, radix-2 (Cooley-Tukey).
