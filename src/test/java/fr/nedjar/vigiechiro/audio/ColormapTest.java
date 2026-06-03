@@ -14,11 +14,11 @@ class ColormapTest {
 
   @Test
   void extremesCorrespondentAuxPremierEtDernierStops() {
-    // SOMBRE : t=0 -> noir (premier stop), t=1 -> jaune (dernier stop).
+    // SOMBRE : t=0 -> #0b0f14 (assorti au fond CSS), t=1 -> jaune (dernier stop).
     Color sombre0 = Colormap.SOMBRE.at(0);
-    assertThat(sombre0.getRed()).isCloseTo(0.0, within(1e-6));
-    assertThat(sombre0.getGreen()).isCloseTo(0.0, within(1e-6));
-    assertThat(sombre0.getBlue()).isCloseTo(0.0, within(1e-6));
+    assertThat(sombre0.getRed()).isCloseTo(0.043, within(1e-3));
+    assertThat(sombre0.getGreen()).isCloseTo(0.059, within(1e-3));
+    assertThat(sombre0.getBlue()).isCloseTo(0.078, within(1e-3));
 
     Color sombre1 = Colormap.SOMBRE.at(1);
     assertThat(sombre1.getRed()).isCloseTo(1.0, within(1e-6));
@@ -38,12 +38,12 @@ class ColormapTest {
 
   @Test
   void interpolationLineaireEntreLesStops() {
-    // SOMBRE : entre stop 0 (0, 0, 0) et stop à t=0.35 (0.20, 0.05, 0.45).
-    // À t=0.175 (mi-chemin), chaque composante doit être à la moitié.
+    // SOMBRE : entre stop 0 (0.043, 0.059, 0.078) et stop à t=0.35 (0.20, 0.05, 0.45).
+    // À t=0.175 (mi-chemin), chaque composante doit être à la moitié des deux bornes.
     Color mid = Colormap.SOMBRE.at(0.175);
-    assertThat(mid.getRed()).isCloseTo(0.10, within(1e-6));
-    assertThat(mid.getGreen()).isCloseTo(0.025, within(1e-6));
-    assertThat(mid.getBlue()).isCloseTo(0.225, within(1e-6));
+    assertThat(mid.getRed()).isCloseTo((0.043 + 0.20) / 2, within(1e-6));
+    assertThat(mid.getGreen()).isCloseTo((0.059 + 0.05) / 2, within(1e-6));
+    assertThat(mid.getBlue()).isCloseTo((0.078 + 0.45) / 2, within(1e-6));
   }
 
   @Test

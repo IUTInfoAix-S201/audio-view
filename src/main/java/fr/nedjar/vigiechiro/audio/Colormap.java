@@ -13,10 +13,14 @@ import javafx.scene.paint.Color;
  * (extrémités, continuité, monotonie de luminance). Issue #12.
  */
 enum Colormap {
-  /** Rampe sombre par défaut : noir → bleu → magenta → jaune (style magma). */
+  /**
+   * Rampe sombre par défaut : fond ~#0b0f14 (identique au fond CSS de {@code
+   * .audio-view-plot-area}) → bleu → magenta → jaune (style magma). Le stop 0 colle au fond pour
+   * que les zones silencieuses du spectrogramme se fondent dans le fond du composant.
+   */
   SOMBRE(
       new double[][] {
-        {0.00, 0.00, 0.00, 0.00},
+        {0.00, 0.043, 0.059, 0.078},
         {0.35, 0.20, 0.05, 0.45},
         {0.70, 0.85, 0.15, 0.35},
         {1.00, 1.00, 0.95, 0.30}

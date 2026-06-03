@@ -45,12 +45,19 @@
 
   <center>
     <StackPane fx:id="plotsStack">
-      <VBox fx:id="plots" spacing="2">
+      <!-- spacing=0 : le curseur de lecture (rouge) traverse sono et spectro de manière
+           pixel-continue, sans bande sombre entre les deux. -->
+      <VBox fx:id="plots" spacing="0">
         <!-- Hôtes à taille minimale nulle : sinon le Canvas (non redimensionnable) bloquerait la
              réduction de la fenêtre. Tailles et positions des nœuds sont câblées par le contrôleur. -->
 
-        <!-- Sonogramme : enveloppe min/max tracée sur Canvas (irréductible) + curseur en nœud. -->
-        <Pane fx:id="sonoHost" styleClass="audio-view-plot-area" minWidth="0" minHeight="0">
+        <!-- Sonogramme : grille de fond (temps + axe zéro), enveloppe min/max tracée sur Canvas
+             (irréductible) et curseur en nœud. La grille est dessinée en premier pour qu'elle
+             apparaisse derrière l'onde. La classe audio-view-sono-area ajoute un fin séparateur
+             en bas (bordure CSS, traversée par le curseur rouge qui est un nœud enfant). -->
+        <Pane fx:id="sonoHost" styleClass="audio-view-plot-area, audio-view-sono-area"
+              minWidth="0" minHeight="0">
+          <Pane fx:id="sonoAxisLayer" mouseTransparent="true"/>
           <Canvas fx:id="sonoCanvas"/>
           <Line fx:id="sonoCursor" styleClass="audio-view-cursor" managed="false"/>
         </Pane>

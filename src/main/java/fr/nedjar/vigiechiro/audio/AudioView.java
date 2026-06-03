@@ -153,6 +153,7 @@ public class AudioView extends BorderPane {
   @FXML private Pane sonoHost;
   @FXML private Pane spectroHost;
   @FXML private Canvas sonoCanvas;
+  @FXML private Pane sonoAxisLayer;
   @FXML private Line sonoCursor;
   @FXML private ImageView spectroImage;
   @FXML private Pane axisLayer;
@@ -200,10 +201,12 @@ public class AudioView extends BorderPane {
     spectroImage.fitHeightProperty().bind(spectroHost.heightProperty().subtract(AXIS_BOTTOM));
     axisLayer.prefWidthProperty().bind(spectroHost.widthProperty());
     axisLayer.prefHeightProperty().bind(spectroHost.heightProperty());
+    sonoAxisLayer.prefWidthProperty().bind(sonoHost.widthProperty());
+    sonoAxisLayer.prefHeightProperty().bind(sonoHost.heightProperty());
 
     // Répartition verticale sonogramme / spectrogramme (32 % / 68 %).
     sonoHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.32));
-    spectroHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.68).subtract(2));
+    spectroHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.68));
 
     // Adaptation responsive (issue #30) : à l'étroit, on masque les éléments accessoires plutôt
     // que de tout tasser. La toolbar reste toujours visible (minHeight calculé par BorderPane
@@ -368,16 +371,68 @@ public class AudioView extends BorderPane {
    */
   private void updateAxes() {
     axisLayer.getChildren().clear();
+    sonoAxisLayer.getChildren().clear();
     AudioSample sample = vm.getSample();
-    double plotW = spectroHost.getWidth() - AXIS_LEFT;
-    double plotH = spectroHost.getHeight() - AXIS_BOTTOM;
-    if (sample == null || plotW < 1 || plotH < 1) {
+    if (sample == null) {
       return;
     }
-    double fz = Math.max(1, vm.getFrequencyZoom());
-    double fMaxFileVisible = (sample.sampleRate() / 2.0) / fz;
-    addFrequencyAxis(plotW, plotH, fMaxFileVisible);
-    addTimeAxis(plotW, plotH, vm.windowStart(), vm.windowDuration());
+    double start = vm.windowStart();
+    double win = vm.windowDuration();
+    double spectroPlotW = spectroHost.getWidth() - AXIS_LEFT;
+    double spectroPlotH = spectroHost.getHeight() - AXIS_BOTTOM;
+    if (spectroPlotW >= 1 && spectroPlotH >= 1) {
+      double fz = Math.max(1, vm.getFrequencyZoom());
+      double fMaxFileVisible = (sample.sampleRate() / 2.0) / fz;
+      addFrequencyAxis(spectroPlotW, spectroPlotH, fMaxFileVisible);
+      addTimeAxis(spectroPlotW, spectroPlotH, start, win);
+    }
+    double sonoPlotW = sonoCanvas.getWidth() - AXIS_LEFT;
+    double sonoPlotH = sonoCanvas.getHeight();
+    if (sonoPlotW >= 1 && sonoPlotH >= 1) {
+      addSonoTimeGrid(sonoPlotW, sonoPlotH, start, win);
+      addSonoAmplitudeAxis(sonoPlotW, sonoPlotH);
+    }
+  }
+
+  /** Grille de fond du sonogramme : ticks temporels alignés sur ceux du spectro. */
+  private void addSonoTimeGrid(double plotW, double plotH, double start, double win) {
+    if (win <= 0) {
+      return;
+    }
+    double factor = vm.expansionFactor();
+    double t0 = start / factor;
+    double t1 = (start + win) / factor;
+    double step = AudioViewModel.niceStep(t1 - t0, 6);
+    for (AxisTicks.Tick tick : AxisTicks.compute(t0, t1, step, plotW)) {
+      double x = AXIS_LEFT + tick.positionPx();
+      sonoAxisLayer.getChildren().add(gridLine(x, 0, x, plotH));
+    }
+  }
+
+  /**
+   * Graduations d'amplitude (gouttière gauche du sonogramme), en valeurs fichier autour de zéro. Le
+   * « pic visible » correspond à {@code 1/sonoScale} (l'auto-échelle ramène le pic du fichier près
+   * du bord) ; les valeurs intermédiaires sont arrondies par {@link AudioViewModel#niceStep}. Le
+   * tick à 0 fait office d'axe zéro horizontal.
+   */
+  private void addSonoAmplitudeAxis(double plotW, double plotH) {
+    double sonoScale = vm.getSonoScale();
+    if (sonoScale <= 0 || plotH < 4) {
+      return;
+    }
+    double peak = 1.0 / sonoScale;
+    double step = AudioViewModel.niceStep(2 * peak, 4);
+    for (AxisTicks.Tick tick : AxisTicks.compute(-peak, peak, step, plotH)) {
+      double y = plotH - tick.positionPx(); // max en haut, comme l'axe fréquence
+      sonoAxisLayer.getChildren().add(gridLine(AXIS_LEFT, y, AXIS_LEFT + plotW, y));
+      sonoAxisLayer.getChildren().add(tickLine(AXIS_LEFT - 4, y, AXIS_LEFT, y));
+      Label lbl = axisLabel(AudioViewModel.formatAxis(tick.value(), step));
+      lbl.setPrefSize(AXIS_LEFT - 8, 14);
+      lbl.setAlignment(Pos.CENTER_RIGHT);
+      lbl.setLayoutX(2);
+      lbl.setLayoutY(clamp(y - 7, 0, plotH - 14));
+      sonoAxisLayer.getChildren().add(lbl);
+    }
   }
 
   /** Graduations de fréquence (gouttière gauche), en kHz, mises à l'échelle par le facteur. */
@@ -387,22 +442,24 @@ public class AudioView extends BorderPane {
       return;
     }
     double stepHz = AudioViewModel.niceStep(fMaxHz, 5);
-    int nTicks = (int) Math.floor(fMaxHz / stepHz);
-    for (int i = 0; i <= nTicks; i++) {
-      double f = i * stepHz;
-      double y = plotH * (1 - f / fMaxHz);
+    // L'axe fréquence est inversé (le 0 est en bas) : on calcule la position « naturelle » via
+    // AxisTicks puis on la retourne (y = plotH - positionPx).
+    for (AxisTicks.Tick tick : AxisTicks.compute(0, fMaxHz, stepHz, plotH)) {
+      double y = plotH - tick.positionPx();
       axisLayer.getChildren().add(gridLine(AXIS_LEFT, y, AXIS_LEFT + plotW, y));
       axisLayer.getChildren().add(tickLine(AXIS_LEFT - 4, y, AXIS_LEFT, y));
-      Label lbl = axisLabel(AudioViewModel.formatAxis(f / 1000.0, stepHz / 1000.0));
+      Label lbl = axisLabel(AudioViewModel.formatAxis(tick.value() / 1000.0, stepHz / 1000.0));
       lbl.setPrefSize(AXIS_LEFT - 8, 14);
       lbl.setAlignment(Pos.CENTER_RIGHT);
       lbl.setLayoutX(2);
-      lbl.setLayoutY(clamp(y - 7, 0, plotH - 14));
+      // borne min à 6 px : laisse un peu d'air entre le séparateur sono/spectro et l'étiquette
+      // tout en haut de l'axe, peu importe la valeur de la plus haute graduation.
+      lbl.setLayoutY(clamp(y - 7, 6, plotH - 14));
       axisLayer.getChildren().add(lbl);
     }
     Label unit = axisLabel("kHz");
     unit.setLayoutX(2);
-    unit.setLayoutY(0);
+    unit.setLayoutY(6);
     axisLayer.getChildren().add(unit);
   }
 
@@ -414,16 +471,12 @@ public class AudioView extends BorderPane {
     double factor = vm.expansionFactor();
     double t0 = start / factor;
     double t1 = (start + win) / factor;
-    double range = t1 - t0;
-    double step = AudioViewModel.niceStep(range, 6);
-    int firstIndex = (int) Math.ceil(t0 / step);
-    int lastIndex = (int) Math.floor(t1 / step);
-    for (int i = firstIndex; i <= lastIndex; i++) {
-      double t = i * step;
-      double x = AXIS_LEFT + plotW * ((t - t0) / range);
+    double step = AudioViewModel.niceStep(t1 - t0, 6);
+    for (AxisTicks.Tick tick : AxisTicks.compute(t0, t1, step, plotW)) {
+      double x = AXIS_LEFT + tick.positionPx();
       axisLayer.getChildren().add(gridLine(x, 0, x, plotH));
       axisLayer.getChildren().add(tickLine(x, plotH, x, plotH + 4));
-      Label lbl = axisLabel(AudioViewModel.formatAxis(t, step));
+      Label lbl = axisLabel(AudioViewModel.formatAxis(tick.value(), step));
       lbl.setPrefWidth(40);
       lbl.setAlignment(Pos.CENTER);
       lbl.setLayoutX(clamp(x - 20, AXIS_LEFT, AXIS_LEFT + plotW - 40));
