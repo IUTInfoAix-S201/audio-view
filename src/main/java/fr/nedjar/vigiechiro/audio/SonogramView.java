@@ -10,24 +10,31 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 
 /**
- * Sous-vue du tracé sonogramme (custom control fx:root {@code extends Pane}). Issue #9.
+ * Sous-vue du tracé sonogramme (custom control fx:root {@code extends StackPane}). Issue #9.
  *
  * <p>Charge {@code SonogramView.fxml}, expose une méthode {@link #bindTo(SonogramViewModel,
  * ReadOnlyObjectProperty)} pour le câblage par le parent (qui détient la session et la couleur
  * d'onde stylable). Encapsule le rendu du Canvas (enveloppe min/max), la grille temporelle, l'axe
  * d'amplitude et le repositionnement du curseur ; le seek-au-clic est géré ici.
+ *
+ * <p>La racine est un {@link StackPane} qui dimensionne {@code plotHost} (un {@link Pane}
+ * intermédiaire) à sa taille effective. Les autres enfants (axisLayer, canvas, cursor) s'y
+ * raccrochent par bindings sur {@code plotHost} — sans cet intermédiaire, le calcul de pref width
+ * remontait par auto-référence depuis la VBox parent et la gouttière d'axes restait invisible.
  */
-public final class SonogramView extends Pane {
+public final class SonogramView extends StackPane {
 
   /**
    * Largeur de la gouttière gauche, dupliquée depuis {@link AudioView} (constante de mise en page).
    */
   private static final double AXIS_LEFT = 48;
 
+  @FXML private Pane plotHost;
   @FXML private Pane axisLayer;
   @FXML private Canvas canvas;
   @FXML private Line cursor;
@@ -48,10 +55,10 @@ public final class SonogramView extends Pane {
 
   @FXML
   private void initialize() {
-    canvas.widthProperty().bind(widthProperty());
-    canvas.heightProperty().bind(heightProperty());
-    axisLayer.prefWidthProperty().bind(widthProperty());
-    axisLayer.prefHeightProperty().bind(heightProperty());
+    canvas.widthProperty().bind(plotHost.widthProperty());
+    canvas.heightProperty().bind(plotHost.heightProperty());
+    axisLayer.prefWidthProperty().bind(plotHost.widthProperty());
+    axisLayer.prefHeightProperty().bind(plotHost.heightProperty());
   }
 
   /**
@@ -64,8 +71,8 @@ public final class SonogramView extends Pane {
     this.waveColor = waveColor;
 
     ChangeListener<Object> redraw = (o, a, b) -> render();
-    widthProperty().addListener(redraw);
-    heightProperty().addListener(redraw);
+    plotHost.widthProperty().addListener(redraw);
+    plotHost.heightProperty().addListener(redraw);
     vm.sampleProperty().addListener(redraw);
     vm.windowStartBinding().addListener(redraw);
     vm.windowDurationBinding().addListener(redraw);
@@ -195,7 +202,7 @@ public final class SonogramView extends Pane {
     if (vm == null) {
       return;
     }
-    double plotW = getWidth() - AXIS_LEFT;
+    double plotW = plotHost.getWidth() - AXIS_LEFT;
     if (plotW <= 0 || vm.windowDuration() <= 0) {
       return;
     }
