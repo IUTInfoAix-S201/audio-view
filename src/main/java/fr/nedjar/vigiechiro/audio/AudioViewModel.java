@@ -16,7 +16,6 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.concurrent.Task;
-import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
@@ -133,7 +132,8 @@ final class AudioViewModel {
           spectrogram = result.spectrogram();
           sample.set(result.sample());
           sonoScale.set(result.sonoScale());
-          spectrogramImage.set(buildSpectrogramImage(spectrogram));
+          spectrogramImage.set(
+              SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
           // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
           frequencyZoom.set(result.suggestedFrequencyZoom());
           playback.loadFile(path);
@@ -235,24 +235,6 @@ final class AudioViewModel {
     return String.format("%." + decimals + "f", value);
   }
 
-  /** Construit l'image du spectrogramme avec la colormap active (nécessite le toolkit JavaFX). */
-  WritableImage buildSpectrogramImage(Spectrogram spec) {
-    int w = Math.max(1, spec.frameCount());
-    int h = Math.max(1, spec.binCount());
-    WritableImage img = new WritableImage(w, h);
-    PixelWriter pw = img.getPixelWriter();
-    for (int x = 0; x < spec.frameCount(); x++) {
-      for (int y = 0; y < h; y++) {
-        int bin = h - 1 - y; // basses fréquences en bas
-        double db = spec.magnitudeDb(x, bin);
-        double norm = (db - MIN_DB) / (MAX_DB - MIN_DB);
-        norm = Math.max(0, Math.min(1, norm));
-        pw.setColor(x, y, colormap.at(norm));
-      }
-    }
-    return img;
-  }
-
   /** Change la colormap active et reconstruit l'image du spectrogramme si un fichier est chargé. */
   void setColormap(Colormap colormap) {
     if (this.colormap == colormap) {
@@ -260,7 +242,7 @@ final class AudioViewModel {
     }
     this.colormap = colormap;
     if (spectrogram != null) {
-      spectrogramImage.set(buildSpectrogramImage(spectrogram));
+      spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
     }
   }
 
