@@ -2,7 +2,6 @@ package fr.nedjar.vigiechiro.audio;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import javafx.animation.AnimationTimer;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.DoubleBinding;
 import javafx.beans.property.BooleanProperty;
@@ -14,7 +13,6 @@ import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.concurrent.Task;
@@ -23,13 +21,17 @@ import javafx.scene.image.WritableImage;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 /**
- * ViewModel d'{@link AudioView} (MVVM). Il détient l'état observable et toute la logique (décodage
- * + FFT en tâche de fond, lecture audio, fenêtre temps/fréquence, auto-échelles) <b>sans aucune
- * dépendance au graphe de scène</b> : il est donc testable sans interface (voir {@code
- * AudioViewModelTest}). La vue s'y lie par bindings et lui adresse des commandes.
+ * ViewModel d'{@link AudioView} (MVVM). Il tient l'état observable et orchestre :
  *
- * <p>Les calculs purs (fenêtre, auto-échelles, graduations, colormap) sont des méthodes statiques
- * pour rester testables sans instancier le ViewModel.
+ * <ul>
+ *   <li>le chargement via {@link AudioAnalyzer} (décode + FFT + auto-échelles, sans toolkit) ;
+ *   <li>la lecture via {@link PlaybackModel} (player + timer + transitions) ;
+ *   <li>la fenêtre temps/fréquence et la traduction des erreurs de chargement.
+ * </ul>
+ *
+ * <p>Pas de dépendance au graphe de scène : la vue s'y lie par bindings et lui adresse des
+ * commandes. Les calculs purs (fenêtre, graduations, format) sont des méthodes statiques pour
+ * rester testables sans instancier le ViewModel.
  */
 @SuppressWarnings({"PMD.GodClass", "PMD.NcssCount", "PMD.CyclomaticComplexity"})
 final class AudioViewModel {
@@ -39,16 +41,16 @@ final class AudioViewModel {
 
   // ----- État réglable -----
   private final ObjectProperty<Path> audioFile = new SimpleObjectProperty<>(this, "audioFile");
-  private final BooleanProperty playing = new SimpleBooleanProperty(this, "playing", false);
   private final DoubleProperty timeZoom = new SimpleDoubleProperty(this, "timeZoom", 1);
   private final DoubleProperty frequencyZoom = new SimpleDoubleProperty(this, "frequencyZoom", 1);
   private final DoubleProperty timeExpansion =
       new SimpleDoubleProperty(this, "timeExpansionFactor", 1);
 
+  // ----- Transport (playing/currentTime/duration + player + timer) délégué à PlaybackModel (#14)
+  // -----
+  private final PlaybackModel playback = new PlaybackModel();
+
   // ----- État dérivé (lecture seule) -----
-  private final ReadOnlyDoubleWrapper currentTime =
-      new ReadOnlyDoubleWrapper(this, "currentTime", 0);
-  private final ReadOnlyDoubleWrapper duration = new ReadOnlyDoubleWrapper(this, "duration", 0);
   private final ReadOnlyObjectWrapper<AudioSample> sample =
       new ReadOnlyObjectWrapper<>(this, "sample");
   private final ReadOnlyObjectWrapper<WritableImage> spectrogramImage =
@@ -68,89 +70,47 @@ final class AudioViewModel {
   // constante pendant la lecture, donc seul le curseur (lié à currentTime) bouge.
   private final DoubleBinding windowStartBinding =
       Bindings.createDoubleBinding(
-          () -> windowStart(duration.get(), currentTime.get(), timeZoom.get()),
-          duration,
-          currentTime,
+          () -> windowStart(playback.duration(), playback.currentTime(), timeZoom.get()),
+          playback.durationProperty(),
+          playback.currentTimeProperty(),
           timeZoom);
 
   private final DoubleBinding windowDurationBinding =
       Bindings.createDoubleBinding(
-          () -> windowDuration(duration.get(), timeZoom.get()), duration, timeZoom);
-
-  private final AudioPlayer player = new AudioPlayer();
-  private final AnimationTimer timer;
+          () -> windowDuration(playback.duration(), timeZoom.get()),
+          playback.durationProperty(),
+          timeZoom);
 
   // Conservés pour reconstruire l'image du spectrogramme quand la colormap change (bascule thème).
   private Spectrogram spectrogram;
   private Colormap colormap = Colormap.SOMBRE;
 
   AudioViewModel() {
-    // timer assigné avant le listener "playing" qui le capture (champ final).
-    timer =
-        new AnimationTimer() {
-          @Override
-          public void handle(long now) {
-            double pos = player.position();
-            if (duration.get() > 0 && pos >= duration.get()) {
-              currentTime.set(duration.get());
-              playing.set(false);
-              return;
-            }
-            currentTime.set(pos);
-          }
-        };
-
     audioFile.addListener((o, oldFile, newFile) -> loadAudio(newFile));
-
-    playing.addListener(
-        (o, was, now) -> {
-          if (now) {
-            // En fin d'extrait, un nouveau démarrage repart de zéro.
-            if (duration.get() > 0 && currentTime.get() >= duration.get()) {
-              player.seek(0);
-              currentTime.set(0);
-            }
-            player.play();
-            timer.start();
-          } else {
-            player.pause();
-            timer.stop();
-          }
-        });
-
-    currentTime.addListener((o, a, b) -> updateTimeText());
-    duration.addListener((o, a, b) -> updateTimeText());
+    playback.currentTimeProperty().addListener((o, a, b) -> updateTimeText());
+    playback.durationProperty().addListener((o, a, b) -> updateTimeText());
     timeExpansion.addListener((o, a, b) -> updateTimeText());
   }
 
-  // ----- Commandes -----
+  // ----- Commandes (déléguées au PlaybackModel) -----
 
   void togglePlay() {
-    playing.set(!playing.get());
+    playback.togglePlay();
   }
 
   /** Positionne la lecture (temps fichier, en secondes), borné à [0, durée]. */
   void seek(double tFile) {
-    if (duration.get() <= 0) {
-      return;
-    }
-    double t = Math.max(0, Math.min(duration.get(), tFile));
-    player.seek(t);
-    currentTime.set(t);
+    playback.seek(tFile);
   }
 
   void dispose() {
-    timer.stop();
-    player.close();
+    playback.dispose();
   }
 
   // ----- Chargement (orchestration) -----
 
   private void loadAudio(Path path) {
-    playing.set(false);
-    player.close();
-    currentTime.set(0);
-    duration.set(0);
+    playback.reset();
     sample.set(null);
     spectrogramImage.set(null);
     spectrogram = null;
@@ -176,14 +136,8 @@ final class AudioViewModel {
           spectrogramImage.set(buildSpectrogramImage(spectrogram));
           // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
           frequencyZoom.set(result.suggestedFrequencyZoom());
-          try {
-            player.load(path);
-          } catch (Exception ignored) {
-            // La lecture audio est optionnelle : l'affichage reste fonctionnel sans son.
-          }
-          duration.set(result.durationSeconds());
-          currentTime.set(0);
-          updateTimeText();
+          playback.loadFile(path);
+          playback.setDuration(result.durationSeconds());
         });
     // Sans cet onFailed, une Task qui échoue (WAV corrompu, format inattendu…) laissait le
     // composant vide en silence, sans aucun retour pour l'utilisateur (issue #22).
@@ -207,7 +161,7 @@ final class AudioViewModel {
   }
 
   private void updateTimeText() {
-    timeText.set(formatTimeText(currentTime.get(), duration.get(), expansionFactor()));
+    timeText.set(formatTimeText(playback.currentTime(), playback.duration(), expansionFactor()));
   }
 
   // ----- Calculs purs (testables sans interface) -----
@@ -218,7 +172,11 @@ final class AudioViewModel {
   }
 
   double windowDuration() {
-    return windowDuration(duration.get(), timeZoom.get());
+    return windowDuration(playback.duration(), timeZoom.get());
+  }
+
+  double windowStart() {
+    return windowStart(playback.duration(), playback.currentTime(), timeZoom.get());
   }
 
   /**
@@ -231,10 +189,6 @@ final class AudioViewModel {
   /** Binding observable de {@link #windowDuration()} (idem). */
   DoubleBinding windowDurationBinding() {
     return windowDurationBinding;
-  }
-
-  double windowStart() {
-    return windowStart(duration.get(), currentTime.get(), timeZoom.get());
   }
 
   static double windowDuration(double dur, double timeZoom) {
@@ -254,8 +208,6 @@ final class AudioViewModel {
     double f = factor > 0 ? factor : 1;
     return String.format("%.2f / %.2f s", currentFile / f, durationFile / f);
   }
-
-  // sonoScaleFor et autoFrequencyZoom ont migré vers AudioAnalyzer (issue #10).
 
   /** Pas de graduation « rond » (1, 2, 5 × 10^k) couvrant range avec ~target intervalles. */
   static double niceStep(double range, int target) {
@@ -319,7 +271,7 @@ final class AudioViewModel {
   }
 
   BooleanProperty playingProperty() {
-    return playing;
+    return playback.playingProperty();
   }
 
   DoubleProperty timeZoomProperty() {
@@ -335,11 +287,11 @@ final class AudioViewModel {
   }
 
   ReadOnlyDoubleProperty currentTimeProperty() {
-    return currentTime.getReadOnlyProperty();
+    return playback.currentTimeProperty();
   }
 
   ReadOnlyDoubleProperty durationProperty() {
-    return duration.getReadOnlyProperty();
+    return playback.durationProperty();
   }
 
   ReadOnlyObjectProperty<AudioSample> sampleProperty() {
@@ -375,11 +327,11 @@ final class AudioViewModel {
   }
 
   double getCurrentTime() {
-    return currentTime.get();
+    return playback.currentTime();
   }
 
   double getDuration() {
-    return duration.get();
+    return playback.duration();
   }
 
   double getFrequencyZoom() {

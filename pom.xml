@@ -293,6 +293,7 @@
                     <include>fr.nedjar.vigiechiro.audio.Colormap</include>
                     <include>fr.nedjar.vigiechiro.audio.AxisTicks</include>
                     <include>fr.nedjar.vigiechiro.audio.AudioAnalyzer</include>
+                    <include>fr.nedjar.vigiechiro.audio.PlaybackModel</include>
                   </includes>
                   <limits>
                     <limit>
@@ -330,6 +331,7 @@
             <param>fr.nedjar.vigiechiro.audio.Colormap</param>
             <param>fr.nedjar.vigiechiro.audio.AxisTicks</param>
             <param>fr.nedjar.vigiechiro.audio.AudioAnalyzer</param>
+            <param>fr.nedjar.vigiechiro.audio.PlaybackModel</param>
           </targetClasses>
           <targetTests>
             <param>fr.nedjar.vigiechiro.audio.FftTest</param>
@@ -338,6 +340,7 @@
             <param>fr.nedjar.vigiechiro.audio.ColormapTest</param>
             <param>fr.nedjar.vigiechiro.audio.AxisTicksTest</param>
             <param>fr.nedjar.vigiechiro.audio.AudioAnalyzerTest</param>
+            <param>fr.nedjar.vigiechiro.audio.PlaybackModelTest</param>
           </targetTests>
         </configuration>
       </plugin>
