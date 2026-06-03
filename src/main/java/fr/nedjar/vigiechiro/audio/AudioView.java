@@ -506,7 +506,7 @@ public class AudioView extends BorderPane {
     legend.getChildren().add(entete);
 
     Rectangle bande = new Rectangle(stripX, stripTop, stripW, barH);
-    bande.setFill(buildColorbarGradient(isLightTheme()));
+    bande.setFill(buildColorbarGradient(colormapFor(isLightTheme())));
     bande.setStroke(AXIS_TEXT);
     bande.setStrokeWidth(1);
     legend.getChildren().add(bande);
@@ -527,17 +527,22 @@ public class AudioView extends BorderPane {
     }
   }
 
-  /**
-   * Dégradé reproduisant la colormap du spectrogramme (haut = intensité max) pour le thème actif.
-   */
-  private static LinearGradient buildColorbarGradient(boolean light) {
+  /** Dégradé reproduisant la {@link Colormap} fournie (haut = intensité max) pour la légende dB. */
+  private static LinearGradient buildColorbarGradient(Colormap colormap) {
     int n = 16;
     Stop[] stops = new Stop[n + 1];
     for (int i = 0; i <= n; i++) {
       double offset = i / (double) n;
-      stops[i] = new Stop(offset, AudioViewModel.colormap(1 - offset, light));
+      stops[i] = new Stop(offset, colormap.at(1 - offset));
     }
     return new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE, stops);
+  }
+
+  /**
+   * Conversion thème (booléen) → {@link Colormap} : sert de pont entre l'API publique et l'enum.
+   */
+  private static Colormap colormapFor(boolean light) {
+    return light ? Colormap.CLAIR : Colormap.SOMBRE;
   }
 
   private void seekFromX(double mouseX, double hostWidth) {
@@ -672,9 +677,10 @@ public class AudioView extends BorderPane {
 
   private void applyTheme(boolean light) {
     pseudoClassStateChanged(LIGHT_THEME, light);
-    vm.setLightColormap(light);
+    Colormap colormap = colormapFor(light);
+    vm.setColormap(colormap);
     if (colorbarBande != null) {
-      colorbarBande.setFill(buildColorbarGradient(light));
+      colorbarBande.setFill(buildColorbarGradient(colormap));
     }
   }
 

@@ -290,6 +290,7 @@
                     <include>fr.nedjar.vigiechiro.audio.Fft</include>
                     <include>fr.nedjar.vigiechiro.audio.Spectrogram</include>
                     <include>fr.nedjar.vigiechiro.audio.AudioSample</include>
+                    <include>fr.nedjar.vigiechiro.audio.Colormap</include>
                   </includes>
                   <limits>
                     <limit>
@@ -324,11 +325,13 @@
             <param>fr.nedjar.vigiechiro.audio.Fft</param>
             <param>fr.nedjar.vigiechiro.audio.Spectrogram</param>
             <param>fr.nedjar.vigiechiro.audio.AudioSample</param>
+            <param>fr.nedjar.vigiechiro.audio.Colormap</param>
           </targetClasses>
           <targetTests>
             <param>fr.nedjar.vigiechiro.audio.FftTest</param>
             <param>fr.nedjar.vigiechiro.audio.SpectrogramTest</param>
             <param>fr.nedjar.vigiechiro.audio.AudioSampleTest</param>
+            <param>fr.nedjar.vigiechiro.audio.ColormapTest</param>
           </targetTests>
         </configuration>
       </plugin>

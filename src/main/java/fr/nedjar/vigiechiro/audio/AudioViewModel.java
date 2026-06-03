@@ -20,7 +20,6 @@ import javafx.beans.property.SimpleObjectProperty;
 import javafx.concurrent.Task;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
-import javafx.scene.paint.Color;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 /**
@@ -89,7 +88,7 @@ final class AudioViewModel {
 
   // Conservés pour reconstruire l'image du spectrogramme quand la colormap change (bascule thème).
   private Spectrogram spectrogram;
-  private boolean lightColormap;
+  private Colormap colormap = Colormap.SOMBRE;
 
   AudioViewModel() {
     // timer assigné avant le listener "playing" qui le capture (champ final).
@@ -343,40 +342,7 @@ final class AudioViewModel {
     return String.format("%." + decimals + "f", value);
   }
 
-  /**
-   * Couleur de la colormap du spectrogramme pour une intensité normalisée {@code t} dans [0,1].
-   * Deux rampes : sombre (fond noir, énergie magma) ou claire (fond blanc cassé assorti au fond CSS
-   * du thème clair, énergie bleu → violet) selon {@code light}.
-   */
-  static Color colormap(double t, boolean light) {
-    double[][] stops =
-        light
-            ? new double[][] {
-              {0.00, 0.957, 0.965, 0.973},
-              {0.40, 0.45, 0.70, 0.90},
-              {0.75, 0.15, 0.30, 0.70},
-              {1.00, 0.25, 0.00, 0.35}
-            }
-            : new double[][] {
-              {0.00, 0.00, 0.00, 0.00},
-              {0.35, 0.20, 0.05, 0.45},
-              {0.70, 0.85, 0.15, 0.35},
-              {1.00, 1.00, 0.95, 0.30}
-            };
-    for (int i = 1; i < stops.length; i++) {
-      if (t <= stops[i][0]) {
-        double[] lo = stops[i - 1];
-        double[] hi = stops[i];
-        double f = (t - lo[0]) / (hi[0] - lo[0]);
-        return Color.color(
-            lo[1] + f * (hi[1] - lo[1]), lo[2] + f * (hi[2] - lo[2]), lo[3] + f * (hi[3] - lo[3]));
-      }
-    }
-    double[] last = stops[stops.length - 1];
-    return Color.color(last[1], last[2], last[3]);
-  }
-
-  /** Construit l'image du spectrogramme (nécessite le toolkit JavaFX). */
+  /** Construit l'image du spectrogramme avec la colormap active (nécessite le toolkit JavaFX). */
   WritableImage buildSpectrogramImage(Spectrogram spec) {
     int w = Math.max(1, spec.frameCount());
     int h = Math.max(1, spec.binCount());
@@ -388,20 +354,18 @@ final class AudioViewModel {
         double db = spec.magnitudeDb(x, bin);
         double norm = (db - MIN_DB) / (MAX_DB - MIN_DB);
         norm = Math.max(0, Math.min(1, norm));
-        pw.setColor(x, y, colormap(norm, lightColormap));
+        pw.setColor(x, y, colormap.at(norm));
       }
     }
     return img;
   }
 
-  /**
-   * Bascule la colormap (sombre/claire) et reconstruit l'image du spectrogramme si un est chargé.
-   */
-  void setLightColormap(boolean light) {
-    if (lightColormap == light) {
+  /** Change la colormap active et reconstruit l'image du spectrogramme si un fichier est chargé. */
+  void setColormap(Colormap colormap) {
+    if (this.colormap == colormap) {
       return;
     }
-    lightColormap = light;
+    this.colormap = colormap;
     if (spectrogram != null) {
       spectrogramImage.set(buildSpectrogramImage(spectrogram));
     }
