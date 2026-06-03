@@ -3,20 +3,15 @@ package fr.nedjar.vigiechiro.audio;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import javax.sound.sampled.AudioFileFormat;
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioInputStream;
-import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
 import org.junit.jupiter.api.Test;
 
 /**
- * Teste la logique pure du ViewModel (fenêtre, auto-échelles, graduations, format) sans interface :
- * c'est tout l'intérêt du MVVM — la logique d'affichage est vérifiable sans démarrer JavaFX.
+ * Teste la logique pure du ViewModel (fenêtre, graduations, format, traduction des erreurs) sans
+ * interface : c'est tout l'intérêt du MVVM — la logique d'affichage est vérifiable sans démarrer
+ * JavaFX. L'analyse audio (décode + STFT + auto-échelles) est testée dans {@link
+ * AudioAnalyzerTest}.
  */
 class AudioViewModelTest {
 
@@ -53,22 +48,6 @@ class AudioViewModelTest {
   }
 
   @Test
-  void autoEchelleSonogrammeSurLePic() throws Exception {
-    // pic = 16384/32768 = 0.5 -> facteur = 0.95 / 0.5 = 1.9
-    AudioSample s = AudioSample.load(ecrireWavMono(8000f, 0.2, (short) 16384));
-    assertThat(AudioViewModel.sonoScaleFor(s)).isCloseTo(1.9, within(0.05));
-  }
-
-  @Test
-  void cadrageFrequentielZoomeSurUneToneBasse() throws Exception {
-    // tone à 500 Hz dans un fichier 8 kHz (Nyquist 4 kHz) : bande utile basse -> zoom > 1
-    AudioSample s = AudioSample.load(ecrireSinusWav(8000f, 1.0, 500));
-    Spectrogram spec = Spectrogram.compute(s, 1024, 256);
-    double zoom = AudioViewModel.autoFrequencyZoom(spec);
-    assertThat(zoom).isGreaterThan(1.5).isLessThanOrEqualTo(64.0);
-  }
-
-  @Test
   void formatLoadErrorTraduitLesCausesCourantes() {
     // Message dédié pour les deux causes typiques (format inattendu / fichier illisible).
     assertThat(AudioViewModel.formatLoadError(new UnsupportedAudioFileException("x")))
@@ -83,39 +62,5 @@ class AudioViewModelTest {
     assertThat(AudioViewModel.formatLoadError(new RuntimeException()))
         .contains("Erreur de chargement");
     assertThat(AudioViewModel.formatLoadError(null)).contains("Erreur de chargement");
-  }
-
-  private static Path ecrireWavMono(float sampleRate, double seconds, short value)
-      throws IOException {
-    int n = (int) (sampleRate * seconds);
-    byte[] data = new byte[n * 2];
-    for (int i = 0; i < n; i++) {
-      data[i * 2] = (byte) (value & 0xFF);
-      data[i * 2 + 1] = (byte) ((value >> 8) & 0xFF);
-    }
-    return ecrire(data, sampleRate, n);
-  }
-
-  private static Path ecrireSinusWav(float sampleRate, double seconds, double freq)
-      throws IOException {
-    int n = (int) (sampleRate * seconds);
-    byte[] data = new byte[n * 2];
-    for (int i = 0; i < n; i++) {
-      double t = i / (double) sampleRate;
-      short v = (short) (Math.sin(2 * Math.PI * freq * t) * 12000);
-      data[i * 2] = (byte) (v & 0xFF);
-      data[i * 2 + 1] = (byte) ((v >> 8) & 0xFF);
-    }
-    return ecrire(data, sampleRate, n);
-  }
-
-  private static Path ecrire(byte[] data, float sampleRate, int frames) throws IOException {
-    AudioFormat fmt = new AudioFormat(sampleRate, 16, 1, true, false);
-    Path out = Files.createTempFile("vm-test", ".wav");
-    try (AudioInputStream ais = new AudioInputStream(new ByteArrayInputStream(data), fmt, frames)) {
-      AudioSystem.write(ais, AudioFileFormat.Type.WAVE, out.toFile());
-    }
-    out.toFile().deleteOnExit();
-    return out;
   }
 }

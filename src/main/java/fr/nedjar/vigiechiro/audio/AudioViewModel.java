@@ -34,12 +34,6 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 @SuppressWarnings({"PMD.GodClass", "PMD.NcssCount", "PMD.CyclomaticComplexity"})
 final class AudioViewModel {
 
-  /** Taille de fenêtre FFT (puissance de deux). */
-  static final int FFT_SIZE = 1024;
-
-  /** Pas entre deux fenêtres FFT successives, en échantillons. */
-  static final int HOP = 256;
-
   static final double MIN_DB = -90.0;
   static final double MAX_DB = -10.0;
 
@@ -166,30 +160,28 @@ final class AudioViewModel {
       return;
     }
 
-    Task<LoadResult> task =
+    Task<AudioAnalyzer.AnalyzedAudio> task =
         new Task<>() {
           @Override
-          protected LoadResult call() throws Exception {
-            AudioSample loaded = AudioSample.load(path);
-            Spectrogram spec = Spectrogram.compute(loaded, FFT_SIZE, HOP);
-            return new LoadResult(loaded, spec);
+          protected AudioAnalyzer.AnalyzedAudio call() throws Exception {
+            return AudioAnalyzer.analyze(path);
           }
         };
     task.setOnSucceeded(
         e -> {
-          LoadResult result = task.getValue();
+          AudioAnalyzer.AnalyzedAudio result = task.getValue();
           spectrogram = result.spectrogram();
           sample.set(result.sample());
-          sonoScale.set(sonoScaleFor(result.sample()));
+          sonoScale.set(result.sonoScale());
           spectrogramImage.set(buildSpectrogramImage(spectrogram));
           // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
-          frequencyZoom.set(autoFrequencyZoom(result.spectrogram()));
+          frequencyZoom.set(result.suggestedFrequencyZoom());
           try {
             player.load(path);
           } catch (Exception ignored) {
             // La lecture audio est optionnelle : l'affichage reste fonctionnel sans son.
           }
-          duration.set(result.sample().durationSeconds());
+          duration.set(result.durationSeconds());
           currentTime.set(0);
           updateTimeText();
         });
@@ -213,8 +205,6 @@ final class AudioViewModel {
     String msg = cause == null ? null : cause.getMessage();
     return "Erreur de chargement" + (msg != null ? " : " + msg : ".");
   }
-
-  private record LoadResult(AudioSample sample, Spectrogram spectrogram) {}
 
   private void updateTimeText() {
     timeText.set(formatTimeText(currentTime.get(), duration.get(), expansionFactor()));
@@ -265,56 +255,7 @@ final class AudioViewModel {
     return String.format("%.2f / %.2f s", currentFile / f, durationFile / f);
   }
 
-  /**
-   * Auto-échelle verticale du sonogramme : facteur tel que le pic du fichier remplisse ~95% de la
-   * demi-hauteur. Les enregistrements de chiroptères étant de faible amplitude, sans cela la forme
-   * d'onde resterait minuscule. Plafonné pour ne pas amplifier démesurément un fichier quasi muet.
-   */
-  static double sonoScaleFor(AudioSample s) {
-    float peak = 0;
-    for (float v : s.samples()) {
-      float a = Math.abs(v);
-      if (a > peak) {
-        peak = a;
-      }
-    }
-    return peak > 1e-6f ? Math.min(0.95 / peak, 100.0) : 1.0;
-  }
-
-  /**
-   * Zoom fréquentiel par défaut calé sur la bande réellement utilisée : on cherche la fréquence la
-   * plus haute dont l'énergie dépasse un seuil sous le pic, puis on cadre {@code [0, fMax]} avec
-   * une marge. Évite d'afficher une grande zone vide en haut du spectrogramme.
-   */
-  static double autoFrequencyZoom(Spectrogram spec) {
-    int bins = spec.binCount();
-    int frames = spec.frameCount();
-    if (bins < 2 || frames < 1) {
-      return 1;
-    }
-    double globalMax = -Double.MAX_VALUE;
-    double[] binMax = new double[bins];
-    for (int b = 0; b < bins; b++) {
-      double m = -Double.MAX_VALUE;
-      for (int f = 0; f < frames; f++) {
-        m = Math.max(m, spec.magnitudeDb(f, b));
-      }
-      binMax[b] = m;
-      globalMax = Math.max(globalMax, m);
-    }
-    double seuil = globalMax - 35.0; // dB sous le pic
-    int plusHaut = 0;
-    for (int b = 0; b < bins; b++) {
-      if (binMax[b] >= seuil) {
-        plusHaut = b;
-      }
-    }
-    double fraction = Math.min(1.0, ((plusHaut + 1) / (double) (bins - 1)) * 1.3);
-    if (fraction <= 0) {
-      return 1;
-    }
-    return Math.max(1, Math.min(64, 1.0 / fraction));
-  }
+  // sonoScaleFor et autoFrequencyZoom ont migré vers AudioAnalyzer (issue #10).
 
   /** Pas de graduation « rond » (1, 2, 5 × 10^k) couvrant range avec ~target intervalles. */
   static double niceStep(double range, int target) {
