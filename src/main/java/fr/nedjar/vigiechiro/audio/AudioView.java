@@ -23,7 +23,6 @@ import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
@@ -146,6 +145,11 @@ public class AudioView extends BorderPane {
       };
 
   private final AudioViewModel vm = new AudioViewModel();
+  // Sous-VM (issue #9) : façades dédiées à chaque tracé. La session reste vm pour l'état partagé
+  // (toolbar, lecture, zooms, erreurs) ; sonoVm / spectroVm n'exposent que ce qui sert au rendu de
+  // leur sous-vue, plus un calcul pur par tracé (amplitudePeak/Step, viewport).
+  private final SonogramViewModel sonoVm = new SonogramViewModel(vm);
+  private final SpectrogramViewModel spectroVm = new SpectrogramViewModel(vm);
 
   // ----- Vue (injectée depuis AudioView.fxml) -----
   @FXML private VBox plots;
@@ -306,16 +310,16 @@ public class AudioView extends BorderPane {
     g.clearRect(0, 0, w, h);
     double plotX = AXIS_LEFT;
     double plotW = w - AXIS_LEFT;
-    AudioSample sample = vm.getSample();
+    AudioSample sample = sonoVm.getSample();
     if (sample == null || plotW < 1 || h < 1) {
       return;
     }
 
     float[] x = sample.samples();
     float sr = sample.sampleRate();
-    double win = vm.windowDuration();
-    double start = vm.windowStart();
-    double sonoScale = vm.getSonoScale();
+    double win = sonoVm.windowDuration();
+    double start = sonoVm.windowStart();
+    double sonoScale = sonoVm.sonoScale();
     int s0 = (int) Math.floor(start * sr);
     int s1 = (int) Math.ceil((start + win) * sr);
     s0 = Math.max(0, Math.min(x.length, s0));
@@ -341,29 +345,14 @@ public class AudioView extends BorderPane {
 
   /** Recadre l'image du spectrogramme (fenêtre temps + tranche basse de fréquence) via viewport. */
   private void updateSpectrogram() {
-    WritableImage img = vm.getSpectrogramImage();
-    AudioSample sample = vm.getSample();
+    WritableImage img = spectroVm.getSpectrogramImage();
+    AudioSample sample = spectroVm.getSample();
     if (img == null || sample == null) {
       spectroImage.setImage(null);
       return;
     }
     spectroImage.setImage(img);
-
-    double dur = vm.getDuration();
-    double win = vm.windowDuration();
-    double start = vm.windowStart();
-    double imgW = img.getWidth();
-    double imgH = img.getHeight();
-
-    double sx = dur <= 0 ? 0 : (start / dur) * imgW;
-    double sw = dur <= 0 ? imgW : (win / dur) * imgW;
-
-    // Zoom fréquence : on n'affiche que la tranche basse (0 .. fMax / zoom), en bas de l'image.
-    double fz = Math.max(1, vm.getFrequencyZoom());
-    double visibleH = imgH / fz;
-    double sy = imgH - visibleH;
-
-    spectroImage.setViewport(new Rectangle2D(sx, sy, Math.max(1, sw), Math.max(1, visibleH)));
+    spectroImage.setViewport(spectroVm.viewport(img.getWidth(), img.getHeight()));
   }
 
   /**
@@ -372,24 +361,22 @@ public class AudioView extends BorderPane {
   private void updateAxes() {
     axisLayer.getChildren().clear();
     sonoAxisLayer.getChildren().clear();
-    AudioSample sample = vm.getSample();
-    if (sample == null) {
+    AudioSample spectroSample = spectroVm.getSample();
+    if (spectroSample == null) {
       return;
     }
-    double start = vm.windowStart();
-    double win = vm.windowDuration();
     double spectroPlotW = spectroHost.getWidth() - AXIS_LEFT;
     double spectroPlotH = spectroHost.getHeight() - AXIS_BOTTOM;
     if (spectroPlotW >= 1 && spectroPlotH >= 1) {
-      double fz = Math.max(1, vm.getFrequencyZoom());
-      double fMaxFileVisible = (sample.sampleRate() / 2.0) / fz;
+      double fz = Math.max(1, spectroVm.frequencyZoom());
+      double fMaxFileVisible = (spectroSample.sampleRate() / 2.0) / fz;
       addFrequencyAxis(spectroPlotW, spectroPlotH, fMaxFileVisible);
-      addTimeAxis(spectroPlotW, spectroPlotH, start, win);
+      addTimeAxis(spectroPlotW, spectroPlotH, spectroVm.windowStart(), spectroVm.windowDuration());
     }
     double sonoPlotW = sonoCanvas.getWidth() - AXIS_LEFT;
     double sonoPlotH = sonoCanvas.getHeight();
     if (sonoPlotW >= 1 && sonoPlotH >= 1) {
-      addSonoTimeGrid(sonoPlotW, sonoPlotH, start, win);
+      addSonoTimeGrid(sonoPlotW, sonoPlotH, sonoVm.windowStart(), sonoVm.windowDuration());
       addSonoAmplitudeAxis(sonoPlotW, sonoPlotH);
     }
   }
@@ -399,7 +386,7 @@ public class AudioView extends BorderPane {
     if (win <= 0) {
       return;
     }
-    double factor = vm.expansionFactor();
+    double factor = sonoVm.expansionFactor();
     double t0 = start / factor;
     double t1 = (start + win) / factor;
     double step = AudioViewModel.niceStep(t1 - t0, 6);
@@ -416,12 +403,11 @@ public class AudioView extends BorderPane {
    * tick à 0 fait office d'axe zéro horizontal.
    */
   private void addSonoAmplitudeAxis(double plotW, double plotH) {
-    double sonoScale = vm.getSonoScale();
-    if (sonoScale <= 0 || plotH < 4) {
+    double peak = sonoVm.amplitudePeak();
+    if (peak <= 0 || plotH < 4) {
       return;
     }
-    double peak = 1.0 / sonoScale;
-    double step = AudioViewModel.niceStep(2 * peak, 4);
+    double step = sonoVm.amplitudeStep();
     for (AxisTicks.Tick tick : AxisTicks.compute(-peak, peak, step, plotH)) {
       double y = plotH - tick.positionPx(); // max en haut, comme l'axe fréquence
       sonoAxisLayer.getChildren().add(gridLine(AXIS_LEFT, y, AXIS_LEFT + plotW, y));
@@ -437,7 +423,7 @@ public class AudioView extends BorderPane {
 
   /** Graduations de fréquence (gouttière gauche), en kHz, mises à l'échelle par le facteur. */
   private void addFrequencyAxis(double plotW, double plotH, double fMaxFileVisibleHz) {
-    double fMaxHz = fMaxFileVisibleHz * vm.expansionFactor();
+    double fMaxHz = fMaxFileVisibleHz * spectroVm.expansionFactor();
     if (fMaxHz <= 0) {
       return;
     }
@@ -468,7 +454,7 @@ public class AudioView extends BorderPane {
     if (win <= 0) {
       return;
     }
-    double factor = vm.expansionFactor();
+    double factor = spectroVm.expansionFactor();
     double t0 = start / factor;
     double t1 = (start + win) / factor;
     double step = AudioViewModel.niceStep(t1 - t0, 6);
@@ -493,9 +479,10 @@ public class AudioView extends BorderPane {
 
   /** Repositionne les deux curseurs (sonogramme et spectrogramme) selon le temps courant. */
   private void updateCursors() {
-    double win = vm.windowDuration();
-    double start = vm.windowStart();
-    double rel = win <= 0 ? -1 : (vm.getCurrentTime() - start) / win;
+    // Fenêtre commune (même session) : on lit depuis sonoVm — spectroVm donnerait la même valeur.
+    double win = sonoVm.windowDuration();
+    double start = sonoVm.windowStart();
+    double rel = win <= 0 ? -1 : (sonoVm.currentTime() - start) / win;
     boolean show = rel >= 0 && rel <= 1;
     double sonoPlotW = sonoCanvas.getWidth() - AXIS_LEFT;
     positionCursor(sonoCursor, show, AXIS_LEFT + rel * sonoPlotW, 0, sonoCanvas.getHeight());
@@ -600,11 +587,11 @@ public class AudioView extends BorderPane {
 
   private void seekFromX(double mouseX, double hostWidth) {
     double plotW = hostWidth - AXIS_LEFT;
-    if (vm.getDuration() <= 0 || plotW <= 0) {
+    if (spectroVm.duration() <= 0 || plotW <= 0) {
       return;
     }
     double rel = Math.max(0, Math.min(1, (mouseX - AXIS_LEFT) / plotW));
-    vm.seek(vm.windowStart() + rel * vm.windowDuration());
+    spectroVm.seek(spectroVm.windowStart() + rel * spectroVm.windowDuration());
   }
 
   // ----- API publique (déléguée au ViewModel) -----

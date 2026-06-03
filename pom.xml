@@ -295,6 +295,8 @@
                     <include>fr.nedjar.vigiechiro.audio.AudioAnalyzer</include>
                     <include>fr.nedjar.vigiechiro.audio.PlaybackModel</include>
                     <include>fr.nedjar.vigiechiro.audio.SpectrogramImageFactory</include>
+                    <include>fr.nedjar.vigiechiro.audio.SonogramViewModel</include>
+                    <include>fr.nedjar.vigiechiro.audio.SpectrogramViewModel</include>
                   </includes>
                   <limits>
                     <limit>
@@ -334,6 +336,8 @@
             <param>fr.nedjar.vigiechiro.audio.AudioAnalyzer</param>
             <param>fr.nedjar.vigiechiro.audio.PlaybackModel</param>
             <param>fr.nedjar.vigiechiro.audio.SpectrogramImageFactory</param>
+            <param>fr.nedjar.vigiechiro.audio.SonogramViewModel</param>
+            <param>fr.nedjar.vigiechiro.audio.SpectrogramViewModel</param>
           </targetClasses>
           <targetTests>
             <param>fr.nedjar.vigiechiro.audio.FftTest</param>
@@ -343,6 +347,8 @@
             <param>fr.nedjar.vigiechiro.audio.AxisTicksTest</param>
             <param>fr.nedjar.vigiechiro.audio.AudioAnalyzerTest</param>
             <param>fr.nedjar.vigiechiro.audio.PlaybackModelTest</param>
+            <param>fr.nedjar.vigiechiro.audio.SonogramViewModelTest</param>
+            <param>fr.nedjar.vigiechiro.audio.SpectrogramViewModelTest</param>
           </targetTests>
         </configuration>
       </plugin>
