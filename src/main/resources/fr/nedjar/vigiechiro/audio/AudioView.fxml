@@ -68,6 +68,11 @@
       <!-- Légende des couleurs (remplie par le contrôleur), alignée en haut-droite. -->
       <Pane fx:id="legend" styleClass="audio-view-legend" StackPane.alignment="TOP_RIGHT"
             mouseTransparent="true"/>
+
+      <!-- Overlay d'erreur de chargement (issue #22) : centré au-dessus des tracés, visible
+           uniquement quand le ViewModel signale une erreur (binding dans le contrôleur). -->
+      <Label fx:id="errorOverlay" styleClass="audio-view-error" StackPane.alignment="CENTER"
+             wrapText="true" mouseTransparent="true" managed="false" visible="false"/>
     </StackPane>
   </center>
 </fx:root>

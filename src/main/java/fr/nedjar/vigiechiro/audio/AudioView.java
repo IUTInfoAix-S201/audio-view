@@ -11,6 +11,7 @@ import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
+import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.css.CssMetaData;
 import javafx.css.PseudoClass;
 import javafx.css.Styleable;
@@ -159,6 +160,9 @@ public class AudioView extends BorderPane {
   @FXML private Label timeLabel;
   @FXML private Button playButton;
 
+  // Overlay d'erreur, visible quand le VM signale une erreur de chargement (issue #22).
+  @FXML private Label errorOverlay;
+
   // Bande dégradée de la légende dB (construite par le contrôleur), réactualisée au changement de
   // thème pour refléter la colormap active.
   private Rectangle colorbarBande;
@@ -217,6 +221,12 @@ public class AudioView extends BorderPane {
         .visibleProperty()
         .bind(plots.heightProperty().greaterThanOrEqualTo(SONO_MIN_PLOTS_HEIGHT));
     sonoHost.managedProperty().bind(sonoHost.visibleProperty());
+
+    // Overlay d'erreur (issue #22) : affiché en surimpression quand le VM signale un échec de
+    // chargement (Task.onFailed) ; masqué dès qu'un nouveau chargement réussit.
+    errorOverlay.textProperty().bind(vm.errorMessageProperty());
+    errorOverlay.visibleProperty().bind(vm.errorMessageProperty().isNotNull());
+    errorOverlay.managedProperty().bind(errorOverlay.visibleProperty());
 
     buildColorbarLegend();
     StackPane.setMargin(legend, new Insets(0, 8, 0, 0));
@@ -638,6 +648,19 @@ public class AudioView extends BorderPane {
   /** Active (vrai) ou désactive (faux, défaut) le thème clair. */
   public final void setLightTheme(boolean value) {
     lightTheme.set(value);
+  }
+
+  /**
+   * Message d'erreur de chargement (issue #22). {@code null} tant qu'aucune erreur n'a été
+   * rencontrée ; renseigné quand la {@link javafx.concurrent.Task} de décodage/FFT échoue (WAV
+   * corrompu, format inattendu…), vidé au prochain (re)chargement.
+   */
+  public final ReadOnlyStringProperty errorMessageProperty() {
+    return vm.errorMessageProperty();
+  }
+
+  public final String getErrorMessage() {
+    return vm.errorMessageProperty().get();
   }
 
   private void applyTheme(boolean light) {

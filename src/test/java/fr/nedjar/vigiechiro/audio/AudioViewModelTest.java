@@ -11,6 +11,7 @@ import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -65,6 +66,23 @@ class AudioViewModelTest {
     Spectrogram spec = Spectrogram.compute(s, 1024, 256);
     double zoom = AudioViewModel.autoFrequencyZoom(spec);
     assertThat(zoom).isGreaterThan(1.5).isLessThanOrEqualTo(64.0);
+  }
+
+  @Test
+  void formatLoadErrorTraduitLesCausesCourantes() {
+    // Message dédié pour les deux causes typiques (format inattendu / fichier illisible).
+    assertThat(AudioViewModel.formatLoadError(new UnsupportedAudioFileException("x")))
+        .contains("non pris en charge");
+    assertThat(AudioViewModel.formatLoadError(new IOException("boum")))
+        .contains("Impossible de lire");
+    // Fallback : préfixe générique + détail de l'exception quand il existe.
+    assertThat(AudioViewModel.formatLoadError(new RuntimeException("oops")))
+        .contains("Erreur de chargement")
+        .contains("oops");
+    // Robustesse : pas de NPE si l'exception ou son message sont null.
+    assertThat(AudioViewModel.formatLoadError(new RuntimeException()))
+        .contains("Erreur de chargement");
+    assertThat(AudioViewModel.formatLoadError(null)).contains("Erreur de chargement");
   }
 
   private static Path ecrireWavMono(float sampleRate, double seconds, short value)

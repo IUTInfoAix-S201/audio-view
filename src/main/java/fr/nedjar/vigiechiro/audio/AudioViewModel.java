@@ -1,5 +1,6 @@
 package fr.nedjar.vigiechiro.audio;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import javafx.animation.AnimationTimer;
 import javafx.beans.property.BooleanProperty;
@@ -18,6 +19,7 @@ import javafx.concurrent.Task;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
+import javax.sound.sampled.UnsupportedAudioFileException;
 
 /**
  * ViewModel d'{@link AudioView} (MVVM). Il détient l'état observable et toute la logique (décodage
@@ -59,6 +61,11 @@ final class AudioViewModel {
   private final ReadOnlyDoubleWrapper sonoScale = new ReadOnlyDoubleWrapper(this, "sonoScale", 1);
   private final ReadOnlyStringWrapper timeText =
       new ReadOnlyStringWrapper(this, "timeText", "0.00 / 0.00 s");
+
+  // null tant qu'aucune erreur de chargement ; renseigné quand la Task échoue, vidé au prochain
+  // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
+  private final ReadOnlyStringWrapper errorMessage =
+      new ReadOnlyStringWrapper(this, "errorMessage", null);
 
   private final AudioPlayer player = new AudioPlayer();
   private final AnimationTimer timer;
@@ -138,6 +145,7 @@ final class AudioViewModel {
     spectrogramImage.set(null);
     spectrogram = null;
     sonoScale.set(1);
+    errorMessage.set(null);
     if (path == null) {
       return;
     }
@@ -169,10 +177,25 @@ final class AudioViewModel {
           currentTime.set(0);
           updateTimeText();
         });
+    // Sans cet onFailed, une Task qui échoue (WAV corrompu, format inattendu…) laissait le
+    // composant vide en silence, sans aucun retour pour l'utilisateur (issue #22).
+    task.setOnFailed(e -> errorMessage.set(formatLoadError(task.getException())));
 
     Thread worker = new Thread(task, "audio-view-loader");
     worker.setDaemon(true);
     worker.start();
+  }
+
+  /** Traduit en français les causes d'échec courantes de {@link AudioSample#load}. */
+  static String formatLoadError(Throwable cause) {
+    if (cause instanceof UnsupportedAudioFileException) {
+      return "Fichier audio non pris en charge (WAV PCM 16 bits attendu).";
+    }
+    if (cause instanceof IOException) {
+      return "Impossible de lire le fichier audio.";
+    }
+    String msg = cause == null ? null : cause.getMessage();
+    return "Erreur de chargement" + (msg != null ? " : " + msg : ".");
   }
 
   private record LoadResult(AudioSample sample, Spectrogram spectrogram) {}
@@ -399,6 +422,10 @@ final class AudioViewModel {
 
   ReadOnlyStringProperty timeTextProperty() {
     return timeText.getReadOnlyProperty();
+  }
+
+  ReadOnlyStringProperty errorMessageProperty() {
+    return errorMessage.getReadOnlyProperty();
   }
 
   AudioSample getSample() {

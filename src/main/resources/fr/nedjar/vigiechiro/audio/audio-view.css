@@ -70,6 +70,18 @@
   -fx-font-size: 10;
 }
 
+/* Overlay d'erreur de chargement (issue #22). Centré au-dessus des tracés. */
+.audio-view-error {
+  -fx-text-fill: #ffb4b4;
+  -fx-font-size: 13;
+  -fx-background-color: rgba(50, 12, 12, 0.85);
+  -fx-padding: 10 18 10 18;
+  -fx-background-radius: 6;
+  -fx-border-color: #ff5252;
+  -fx-border-radius: 6;
+  -fx-max-width: 360;
+}
+
 /* ============================================================================
  * Thème clair : activé par la pseudo-classe :light (AudioView.setLightTheme).
  * Surcharge les mêmes sélecteurs ; le spectrogramme (image d'intensité) reste
@@ -121,4 +133,10 @@
 
 .audio-view:light .audio-view-legend .label {
   -fx-text-fill: #2c3e50;
+}
+
+.audio-view:light .audio-view-error {
+  -fx-text-fill: #c0392b;
+  -fx-background-color: rgba(255, 235, 235, 0.95);
+  -fx-border-color: #c0392b;
 }
