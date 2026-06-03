@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.shape.Line?>
+
+<!--
+  Sous-vue du spectrogramme (custom control fx:root extends StackPane). Insérée par AudioView via
+  <SpectrogramView fx:id="spectroView"/>. La légende dB est rattachée à la zone spectro (issue #9)
+  et alignée TOP_RIGHT par-dessus l'image. L'ImageView est recadrée par viewport, les axes sont
+  régénérés dans axisLayer, le curseur est un nœud (Line) repositionné par script.
+-->
+<fx:root type="javafx.scene.layout.StackPane"
+         xmlns="http://javafx.com/javafx"
+         xmlns:fx="http://javafx.com/fxml"
+         minWidth="0" minHeight="0">
+  <Pane fx:id="plotHost" styleClass="audio-view-plot-area" minWidth="0" minHeight="0">
+    <ImageView fx:id="image" managed="false" smooth="false" pickOnBounds="false"/>
+    <Pane fx:id="axisLayer" mouseTransparent="true"/>
+    <Line fx:id="cursor" styleClass="audio-view-cursor" managed="false"/>
+  </Pane>
+  <Pane fx:id="legend" styleClass="audio-view-legend" StackPane.alignment="TOP_RIGHT"
+        mouseTransparent="true"/>
+</fx:root>

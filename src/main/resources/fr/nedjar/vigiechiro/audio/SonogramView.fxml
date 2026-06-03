@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.shape.Line?>
+
+<!--
+  Sous-vue du sonogramme (custom control fx:root extends Pane). Insérée par AudioView via
+  <SonogramView fx:id="sonoView"/>. Le contrôleur SonogramView lui-même est lié par
+  setRoot/setController. La grille d'axes (Pane) est sous le Canvas pour que l'onde la recouvre ;
+  le curseur (Line) est au-dessus du tout. La classe audio-view-sono-area ajoute un fin séparateur
+  CSS en bas, traversé par le curseur rouge (qui est un nœud enfant).
+-->
+<fx:root type="javafx.scene.layout.Pane"
+         xmlns="http://javafx.com/javafx"
+         xmlns:fx="http://javafx.com/fxml"
+         styleClass="audio-view-plot-area, audio-view-sono-area"
+         minWidth="0" minHeight="0">
+  <Pane fx:id="axisLayer" mouseTransparent="true"/>
+  <Canvas fx:id="canvas"/>
+  <Line fx:id="cursor" styleClass="audio-view-cursor" managed="false"/>
+</fx:root>
