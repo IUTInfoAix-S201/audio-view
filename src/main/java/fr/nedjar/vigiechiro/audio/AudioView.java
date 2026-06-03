@@ -73,6 +73,19 @@ public class AudioView extends BorderPane {
   private static final double AXIS_LEFT = 48;
 
   private static final double AXIS_BOTTOM = 26;
+
+  /**
+   * Seuils de masquage responsive (issue #30) : sous ces tailles, la légende dB et/ou le sonogramme
+   * sont masqués pour laisser toute la place au spectrogramme — plutôt que de tout tasser jusqu'à
+   * devenir illisible. La barre d'outils, elle, reste toujours visible (la hauteur min du composant
+   * est calculée par {@link BorderPane} depuis son {@code top}).
+   */
+  private static final double LEGEND_MIN_PLOT_WIDTH = 320;
+
+  private static final double LEGEND_MIN_SPECTRO_HEIGHT = 200;
+
+  private static final double SONO_MIN_PLOTS_HEIGHT = 120;
+
   private static final Color AXIS_TEXT = Color.web("#9aa4ad");
   private static final Color WAVE_COLOR_DEFAULT = Color.web("#7fd4ff");
 
@@ -186,6 +199,24 @@ public class AudioView extends BorderPane {
     // Répartition verticale sonogramme / spectrogramme (32 % / 68 %).
     sonoHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.32));
     spectroHost.prefHeightProperty().bind(plots.heightProperty().multiply(0.68).subtract(2));
+
+    // Adaptation responsive (issue #30) : à l'étroit, on masque les éléments accessoires plutôt
+    // que de tout tasser. La toolbar reste toujours visible (minHeight calculé par BorderPane
+    // depuis son top, cf. AudioView.fxml). spectroHost a VBox.vgrow=ALWAYS dans la FXML : quand le
+    // sonogramme est masqué, le spectrogramme prend toute la place disponible.
+    legend
+        .visibleProperty()
+        .bind(
+            spectroHost
+                .widthProperty()
+                .subtract(AXIS_LEFT)
+                .greaterThanOrEqualTo(LEGEND_MIN_PLOT_WIDTH)
+                .and(spectroHost.heightProperty().greaterThanOrEqualTo(LEGEND_MIN_SPECTRO_HEIGHT)));
+    legend.managedProperty().bind(legend.visibleProperty());
+    sonoHost
+        .visibleProperty()
+        .bind(plots.heightProperty().greaterThanOrEqualTo(SONO_MIN_PLOTS_HEIGHT));
+    sonoHost.managedProperty().bind(sonoHost.visibleProperty());
 
     buildColorbarLegend();
     StackPane.setMargin(legend, new Insets(0, 8, 0, 0));

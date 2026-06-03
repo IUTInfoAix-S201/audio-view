@@ -17,12 +17,17 @@
   les tailles (bindings), le rendu et les commandes vers le ViewModel. La feuille audio-view.css est
   appliquée par le contrôleur.
 -->
+<!--
+  minHeight non spécifié : BorderPane calcule son min depuis le contenu, ce qui borne la hauteur du
+  composant à la hauteur min de la toolbar (sono/spectro/legend ayant minHeight=0 ou étant masquables
+  par binding). La toolbar reste donc toujours visible quel que soit le redimensionnement.
+-->
 <fx:root type="javafx.scene.layout.BorderPane"
          xmlns="http://javafx.com/javafx"
          xmlns:fx="http://javafx.com/fxml"
          styleClass="audio-view"
          stylesheets="@audio-view.css"
-         minWidth="200" minHeight="120" prefWidth="640" prefHeight="360">
+         minWidth="200" prefWidth="640" prefHeight="360">
 
   <top>
     <HBox fx:id="toolbar" styleClass="audio-view-toolbar" alignment="CENTER_LEFT" spacing="8">
@@ -51,8 +56,10 @@
         </Pane>
 
         <!-- Spectrogramme : image recadrée (ImageView + viewport), axes régénérés dans axisLayer,
-             curseur en nœud. -->
-        <Pane fx:id="spectroHost" styleClass="audio-view-plot-area" minWidth="0" minHeight="0">
+             curseur en nœud. Vgrow ALWAYS pour qu'il prenne toute la place disponible quand le
+             sonogramme est masqué (responsive, cf. issue #30). -->
+        <Pane fx:id="spectroHost" styleClass="audio-view-plot-area" minWidth="0" minHeight="0"
+              VBox.vgrow="ALWAYS">
           <ImageView fx:id="spectroImage" managed="false" smooth="false" pickOnBounds="false"/>
           <Pane fx:id="axisLayer" mouseTransparent="true"/>
           <Line fx:id="spectroCursor" styleClass="audio-view-cursor" managed="false"/>
