@@ -85,7 +85,14 @@ Il enchaîne :
   sans classifier sont des jars vides sans `module-info`) ni passer JavaFX en `compile`.
 - **API publique additive uniquement.** Ne jamais retirer/renommer un membre public d'`AudioView`
   (c'est un contrat vu par les étudiants). Un changement cassant impose un commit majeur
-  (`BREAKING CHANGE:`).
+  (`BREAKING CHANGE:`). Le garde-fou `AudioViewApiTest` (issue #26) fige la liste des membres
+  publics par réflexion : toute divergence (suppression, renommage, changement de type, ajout non
+  répertorié) fait échouer le build. Réagir en :
+  - **Ajout assumé** : compléter `EXPECTED_MEMBERS` dans `AudioViewApiTest` (un commit `feat:`).
+  - **Suppression/renommage assumé** : retirer l'entrée et committer en `BREAKING CHANGE:` (bump
+    majeur de semantic-release).
+  - **Divergence non voulue** : annuler la modification ; le test signale exactement la signature
+    qui dérive.
 - **Compatibilité FXML** : garder le **constructeur sans argument** ; régler le composant par
   propriétés/setters (jamais par le constructeur), pour rester insérable en `<AudioView/>`.
 - **Hooks de personnalisation CSS** (classes `audio-view*`, pseudo-classe `:light`, propriété
