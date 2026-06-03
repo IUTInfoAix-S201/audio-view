@@ -3,6 +3,8 @@ package fr.nedjar.vigiechiro.audio;
 import java.io.IOException;
 import java.nio.file.Path;
 import javafx.animation.AnimationTimer;
+import javafx.beans.binding.Bindings;
+import javafx.beans.binding.DoubleBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
@@ -66,6 +68,21 @@ final class AudioViewModel {
   // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
   private final ReadOnlyStringWrapper errorMessage =
       new ReadOnlyStringWrapper(this, "errorMessage", null);
+
+  // Fenêtre temporelle calculée (issue #23) : début et durée de la portion de signal affichée,
+  // dérivés de duration/currentTime/timeZoom. La vue s'y abonne pour redessiner le contenu
+  // (onde, viewport image, axes) uniquement quand la fenêtre change vraiment — au zoom 1 elle est
+  // constante pendant la lecture, donc seul le curseur (lié à currentTime) bouge.
+  private final DoubleBinding windowStartBinding =
+      Bindings.createDoubleBinding(
+          () -> windowStart(duration.get(), currentTime.get(), timeZoom.get()),
+          duration,
+          currentTime,
+          timeZoom);
+
+  private final DoubleBinding windowDurationBinding =
+      Bindings.createDoubleBinding(
+          () -> windowDuration(duration.get(), timeZoom.get()), duration, timeZoom);
 
   private final AudioPlayer player = new AudioPlayer();
   private final AnimationTimer timer;
@@ -213,6 +230,18 @@ final class AudioViewModel {
 
   double windowDuration() {
     return windowDuration(duration.get(), timeZoom.get());
+  }
+
+  /**
+   * Binding observable de {@link #windowStart()} (déclenche un redessin quand la fenêtre bouge).
+   */
+  DoubleBinding windowStartBinding() {
+    return windowStartBinding;
+  }
+
+  /** Binding observable de {@link #windowDuration()} (idem). */
+  DoubleBinding windowDurationBinding() {
+    return windowDurationBinding;
   }
 
   double windowStart() {

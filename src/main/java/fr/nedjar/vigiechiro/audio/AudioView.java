@@ -12,6 +12,7 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.value.ChangeListener;
 import javafx.css.CssMetaData;
 import javafx.css.PseudoClass;
 import javafx.css.Styleable;
@@ -232,19 +233,25 @@ public class AudioView extends BorderPane {
     StackPane.setMargin(legend, new Insets(0, 8, 0, 0));
     legend.translateYProperty().bind(sonoCanvas.heightProperty().add(8));
 
-    // Redessins/repositions : tout changement d'état du ViewModel ou de taille redéclenche le
-    // rendu.
-    sonoCanvas.widthProperty().addListener((o, a, b) -> refresh());
-    sonoCanvas.heightProperty().addListener((o, a, b) -> refresh());
-    spectroHost.widthProperty().addListener((o, a, b) -> refresh());
-    spectroHost.heightProperty().addListener((o, a, b) -> refresh());
-    vm.timeZoomProperty().addListener((o, a, b) -> refresh());
-    vm.frequencyZoomProperty().addListener((o, a, b) -> refresh());
-    vm.timeExpansionFactorProperty().addListener((o, a, b) -> refresh());
-    vm.currentTimeProperty().addListener((o, a, b) -> refresh());
-    vm.durationProperty().addListener((o, a, b) -> refresh());
-    vm.spectrogramImageProperty().addListener((o, a, b) -> refresh());
-    vm.sampleProperty().addListener((o, a, b) -> refresh());
+    // Perf (issue #23) : on sépare deux familles de déclencheurs pour éviter le redessin complet
+    // à chaque pulse de lecture (~60 fps). Le **contenu lourd** (onde Canvas, viewport ImageView,
+    // nœuds d'axes régénérés) ne se redessine que sur changement de la fenêtre temporelle, du
+    // zoom fréquence, des données ou de la taille. Le **curseur** (Line), lui, se repositionne
+    // sur chaque tick de currentTime (cheap). Au zoom 1, windowStart/Duration sont constants
+    // pendant la lecture → contentUpdate ne se déclenche pas, seul le curseur bouge.
+    ChangeListener<Object> contentUpdate = (o, a, b) -> refresh();
+    sonoCanvas.widthProperty().addListener(contentUpdate);
+    sonoCanvas.heightProperty().addListener(contentUpdate);
+    spectroHost.widthProperty().addListener(contentUpdate);
+    spectroHost.heightProperty().addListener(contentUpdate);
+    vm.windowStartBinding().addListener(contentUpdate);
+    vm.windowDurationBinding().addListener(contentUpdate);
+    vm.frequencyZoomProperty().addListener(contentUpdate);
+    vm.timeExpansionFactorProperty().addListener(contentUpdate);
+    vm.spectrogramImageProperty().addListener(contentUpdate);
+    vm.sampleProperty().addListener(contentUpdate);
+
+    vm.currentTimeProperty().addListener((o, a, b) -> updateCursors());
 
     // Déplacement du curseur de lecture par clic.
     spectroHost.setOnMousePressed(e -> seekFromX(e.getX(), spectroHost.getWidth()));
