@@ -50,6 +50,15 @@
     <Method name="&lt;init&gt;"/>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
+  <!-- PlaybackModel.loadSource(float[], float) mémorise par référence le float[] déjà décodé
+       (AudioSample.samples()) pour reconstruire le PCM à chaque bascule de normalisation peak sans
+       re-décoder le fichier (issue #32). Lecture seule, jamais muté ; cloner dupliquerait le buffer
+       audio (centaines de milliers de floats), même rationale que les constructeurs dsp ci-dessus. -->
+  <Match>
+    <Class name="fr.nedjar.vigiechiro.audio.playback.PlaybackModel"/>
+    <Method name="loadSource"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
   <!-- Le pattern fx:root impose de charger le FXML dans le constructeur (FXMLLoader.load() peut
        lever IOException, relayée en IllegalStateException). Le throw n'est atteint que si le FXML
        embarqué manque/est corrompu (erreur de build), pas un vecteur d'attaque par finaliseur.

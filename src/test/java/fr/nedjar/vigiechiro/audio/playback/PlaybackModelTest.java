@@ -1,6 +1,7 @@
 package fr.nedjar.vigiechiro.audio.playback;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +86,41 @@ class PlaybackModelTest {
         // Comportement par défaut inchangé (issue #15).
         PlaybackModel m = new PlaybackModel();
         assertThat(m.isLoop()).isFalse();
+    }
+
+    @Test
+    void normalisationEstFausseParDefaut() {
+        // Comportement par défaut inchangé : audio joué tel quel (issue #32).
+        PlaybackModel m = new PlaybackModel();
+        assertThat(m.isNormalisation()).isFalse();
+    }
+
+    @Test
+    void basculeNormalisationSansSourceEstSilencieuse() {
+        // Sans fichier chargé, reopen() est un no-op : la bascule ne touche pas au player (toolkit-
+        // free, pas de périphérique sollicité) mais met bien à jour la propriété.
+        PlaybackModel m = new PlaybackModel();
+        assertThatCode(() -> {
+                    m.setNormalisation(true);
+                    m.setNormalisation(false);
+                })
+                .doesNotThrowAnyException();
+        assertThat(m.isNormalisation()).isFalse();
+    }
+
+    @Test
+    void loadSourceEtBasculeNeJettentPasMemeSansPeripheriqueAudio() {
+        // loadSource pré-calcule le gain (peakGain) puis ouvre le clip en best-effort : sans carte
+        // son, l'exception est avalée. Toggle ensuite : reopen() reste silencieux. L'affichage ne
+        // doit jamais être interrompu par la lecture (invariant du composant).
+        PlaybackModel m = new PlaybackModel();
+        assertThatCode(() -> {
+                    m.loadSource(new float[] {0.1f, -0.2f, 0.05f}, 44_100f);
+                    m.setNormalisation(true);
+                    m.setNormalisation(false);
+                    m.dispose();
+                })
+                .doesNotThrowAnyException();
     }
 
     @Test

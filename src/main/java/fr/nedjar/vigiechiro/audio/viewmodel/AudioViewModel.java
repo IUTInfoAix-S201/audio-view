@@ -139,7 +139,9 @@ public final class AudioViewModel {
             spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
             // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
             frequencyZoom.set(result.suggestedFrequencyZoom());
-            playback.loadFile(path);
+            // Alimente la lecture depuis les échantillons déjà décodés (mono, [-1, 1]) : permet la
+            // normalisation peak au rendu (gain pré-multiplié) sans re-décoder le fichier (issue #32).
+            playback.loadSource(result.sample().samples(), result.sample().sampleRate());
             playback.setDuration(result.durationSeconds());
             // ready en DERNIER : le signal n'est émis qu'une fois TOUT en place (sample, image,
             // duration, frequencyZoom calé) — les listeners qui prennent un snapshot voient déjà
@@ -265,6 +267,10 @@ public final class AudioViewModel {
 
     public BooleanProperty loopProperty() {
         return playback.loopProperty();
+    }
+
+    public BooleanProperty normalisationProperty() {
+        return playback.normalisationProperty();
     }
 
     public DoubleProperty timeZoomProperty() {
