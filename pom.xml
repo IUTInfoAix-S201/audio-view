@@ -353,6 +353,8 @@
             <param>fr.nedjar.vigiechiro.audio.render.AxisTicksTest</param>
             <param>fr.nedjar.vigiechiro.audio.dsp.AudioAnalyzerTest</param>
             <param>fr.nedjar.vigiechiro.audio.playback.PlaybackModelTest</param>
+            <param>fr.nedjar.vigiechiro.audio.playback.PlaybackModelToolkitTest</param>
+            <param>fr.nedjar.vigiechiro.audio.render.SpectrogramImageFactoryToolkitTest</param>
             <param>fr.nedjar.vigiechiro.audio.viewmodel.SonogramViewModelTest</param>
             <param>fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModelTest</param>
           </targetTests>

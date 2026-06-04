@@ -62,4 +62,27 @@ class SonogramViewModelTest {
         vm.seek(1.0);
         assertThat(session.getCurrentTime()).isZero();
     }
+
+    @Test
+    void amplitudePeakSurFichierAmplifieDix() {
+        // sonoScale = 10 (amplification ×10) → pic visible = 1/10 = 0.1.
+        // Tue les mutants qui inverseraient le ratio (10 au lieu de 1/10).
+        assertThat(SonogramViewModel.amplitudePeak(10.0)).isCloseTo(0.1, within(1e-12));
+    }
+
+    @Test
+    void amplitudeStepCalibreSurUnPicDe025() {
+        // sonoScale = 4 → pic = 0.25 → range 0.5 → niceStep(0.5, 4) = 0.1.
+        // Vérifie la composition pic → step.
+        assertThat(SonogramViewModel.amplitudeStep(4)).isCloseTo(0.1, within(1e-9));
+    }
+
+    @Test
+    void amplitudePeakInstanceLitLaSession() {
+        // L'instance lit sonoScale() de la session. sonoScale par défaut = 1 → peak = 1.
+        AudioViewModel session = new AudioViewModel();
+        SonogramViewModel vm = new SonogramViewModel(session);
+        assertThat(vm.amplitudePeak()).isEqualTo(1.0);
+        assertThat(vm.amplitudeStep()).isEqualTo(SonogramViewModel.amplitudeStep(1));
+    }
 }
