@@ -81,6 +81,13 @@ public class AudioView extends BorderPane {
     private static final PseudoClass LIGHT_THEME = PseudoClass.getPseudoClass("light");
 
     /**
+     * Pseudo-classe CSS {@code :colorblind} : reflète {@code colorblindFriendly} jusque dans la
+     * couleur de l'onde du sonogramme (le spectrogramme, lui, bascule sa colormap côté Java). Voir
+     * {@code audio-view.css}.
+     */
+    private static final PseudoClass COLORBLIND = PseudoClass.getPseudoClass("colorblind");
+
+    /**
      * Couleur de l'enveloppe du sonogramme, stylable via {@code -fx-wave-color} sur {@code
      * .audio-view}. Comme elle est tracée sur Canvas (invisible au moteur CSS), elle est exposée par
      * une {@link StyleableObjectProperty} + {@link CssMetaData} ; {@link SonogramView} l'écoute via
@@ -129,6 +136,9 @@ public class AudioView extends BorderPane {
     private final BooleanProperty colorblindFriendly = new BooleanPropertyBase(false) {
         @Override
         protected void invalidated() {
+            // Pseudo-classe :colorblind → la couleur de l'onde du sonogramme suit (via CSS), en plus
+            // de la colormap Viridis du spectrogramme appliquée par applyTheme.
+            AudioView.this.pseudoClassStateChanged(COLORBLIND, get());
             applyTheme(lightTheme.get());
         }
 
@@ -370,6 +380,53 @@ public class AudioView extends BorderPane {
         vm.loopProperty().set(value);
     }
 
+    /// Normalisation **peak** du niveau sonore à la lecture (issue #32). À `false` (défaut), l'audio
+    /// est joué tel quel. À `true`, un **gain linéaire** est appliqué au rendu pour ramener le pic du
+    /// fichier près du plein régime, afin d'égaliser le volume d'un extrait à l'autre — les cris de
+    /// chiroptères ayant des amplitudes très variables.
+    ///
+    /// **Sans modifier le fichier** : seul le rendu est affecté (PCM recalculé en mémoire). La
+    /// normalisation peak est volontairement la méthode **la moins déformante** (gain constant, forme
+    /// d'onde préservée, pas de compression). La propriété est modifiable à tout moment ; la bascule
+    /// reprend la lecture là où elle en était.
+    ///
+    /// **Best-effort** : comme le reste de la lecture, sans effet si le périphérique audio est
+    /// indisponible (l'affichage, lui, reste fonctionnel).
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `false`
+    public final BooleanProperty normalisationProperty() {
+        return vm.normalisationProperty();
+    }
+
+    /// `true` si la normalisation peak est active.
+    public final boolean isNormalisation() {
+        return vm.normalisationProperty().get();
+    }
+
+    /// Active (`true`) ou désactive (`false`, défaut) la normalisation peak. Voir
+    /// [#normalisationProperty()].
+    public final void setNormalisation(boolean value) {
+        vm.normalisationProperty().set(value);
+    }
+
+    /// Gain de normalisation peak **effectivement appliqué** au rendu audio, en décibels.
+    ///
+    /// `0` dB quand la normalisation est désactivée ou qu'aucun fichier n'est chargé ; sinon la
+    /// valeur positive (boost) appliquée pour ramener le pic du fichier près du plein régime, par
+    /// ex. `+12.4`. Recalculée à chaque chargement et à chaque bascule de [#normalisationProperty()].
+    /// Utile pour donner un retour visuel (« Normalisé : +X dB ») à l'utilisateur, la normalisation
+    /// n'ayant par nature aucun effet sur les tracés.
+    ///
+    /// @return propriété lecture seule ; valeur par défaut `0`
+    public final ReadOnlyDoubleProperty normalisationGainDbProperty() {
+        return vm.normalisationGainDbProperty();
+    }
+
+    /// Gain de normalisation peak courant, en dB (`0` si désactivé).
+    public final double getNormalisationGainDb() {
+        return vm.getNormalisationGainDb();
+    }
+
     /// Position courante du curseur dans le **temps du fichier**, en secondes.
     ///
     /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le
@@ -565,7 +622,9 @@ public class AudioView extends BorderPane {
     /// Viridis) sinon Sombre / Clair selon `lightTheme`. Visible aux sous-vues via {@code bindTo}.
     private Colormap currentColormap() {
         if (colorblindFriendly.get()) {
-            return Colormap.VIRIDIS;
+            // Variante daltonien assortie au thème : fond clair en thème clair, fond sombre sinon
+            // (toutes deux CVD-safe et ancrées sur le fond pour le contraste).
+            return lightTheme.get() ? Colormap.VIRIDIS_CLAIR : Colormap.VIRIDIS;
         }
         return lightTheme.get() ? Colormap.CLAIR : Colormap.SOMBRE;
     }
