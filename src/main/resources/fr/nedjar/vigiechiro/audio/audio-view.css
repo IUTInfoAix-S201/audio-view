@@ -157,3 +157,21 @@
 .audio-view:light .audio-view-sono-area {
   -fx-border-color: rgba(0, 0, 0, 0.50);
 }
+
+/* ============================================================================
+ * Mode daltonien-friendly : activé par la pseudo-classe :colorblind
+ * (AudioView.setColorblindFriendly). Le spectrogramme passe en colormap Viridis
+ * côté Java ; ici on accorde la couleur de l'onde du sonogramme à une teinte
+ * Viridis pour la cohérence visuelle. Placé après les règles :light pour primer
+ * à spécificité égale.
+ * ========================================================================= */
+
+/* Fond sombre : vert clair Viridis, bon contraste. */
+.audio-view:colorblind {
+  -fx-wave-color: #6ece58;
+}
+
+/* Fond clair : bleu Viridis, lisible sur fond pâle. */
+.audio-view:light:colorblind {
+  -fx-wave-color: #31688e;
+}

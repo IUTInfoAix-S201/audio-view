@@ -81,6 +81,13 @@ public class AudioView extends BorderPane {
     private static final PseudoClass LIGHT_THEME = PseudoClass.getPseudoClass("light");
 
     /**
+     * Pseudo-classe CSS {@code :colorblind} : reflète {@code colorblindFriendly} jusque dans la
+     * couleur de l'onde du sonogramme (le spectrogramme, lui, bascule sa colormap côté Java). Voir
+     * {@code audio-view.css}.
+     */
+    private static final PseudoClass COLORBLIND = PseudoClass.getPseudoClass("colorblind");
+
+    /**
      * Couleur de l'enveloppe du sonogramme, stylable via {@code -fx-wave-color} sur {@code
      * .audio-view}. Comme elle est tracée sur Canvas (invisible au moteur CSS), elle est exposée par
      * une {@link StyleableObjectProperty} + {@link CssMetaData} ; {@link SonogramView} l'écoute via
@@ -129,6 +136,9 @@ public class AudioView extends BorderPane {
     private final BooleanProperty colorblindFriendly = new BooleanPropertyBase(false) {
         @Override
         protected void invalidated() {
+            // Pseudo-classe :colorblind → la couleur de l'onde du sonogramme suit (via CSS), en plus
+            // de la colormap Viridis du spectrogramme appliquée par applyTheme.
+            AudioView.this.pseudoClassStateChanged(COLORBLIND, get());
             applyTheme(lightTheme.get());
         }
 
