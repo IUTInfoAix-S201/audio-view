@@ -27,7 +27,7 @@
 
     <!-- Outils qualité (alignés sur les TP R2.02 / R2.03). -->
     <spotless.maven.plugin.version>3.6.0</spotless.maven.plugin.version>
-    <google.java.format.version>1.35.0</google.java.format.version>
+    <palantir.java.format.version>2.91.0</palantir.java.format.version>
     <git.build.hook.plugin.version>3.6.0</git.build.hook.plugin.version>
     <maven.pmd.plugin.version>3.28.0</maven.pmd.plugin.version>
     <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
@@ -142,10 +142,16 @@
         <version>${spotless.maven.plugin.version}</version>
         <configuration>
           <java>
-            <googleJavaFormat>
-              <version>${google.java.format.version}</version>
-            </googleJavaFormat>
+            <palantirJavaFormat>
+              <version>${palantir.java.format.version}</version>
+              <style>PALANTIR</style>
+              <!-- formatJavadoc=false : préserve les doc-comments Markdown Java (JEP 467,
+                   syntaxe ///) que Palantir reformaterait sinon en HTML. -->
+              <formatJavadoc>false</formatJavadoc>
+            </palantirJavaFormat>
+            <importOrder/>
             <removeUnusedImports/>
+            <formatAnnotations/>
             <trimTrailingWhitespace/>
             <endWithNewline/>
           </java>

@@ -16,52 +16,51 @@ import javax.sound.sampled.UnsupportedAudioFileException;
  */
 public final class AudioPlayer implements AutoCloseable {
 
-  private Clip clip;
+    private Clip clip;
 
-  public void load(Path path)
-      throws IOException, UnsupportedAudioFileException, LineUnavailableException {
-    close();
-    try (AudioInputStream in = AudioSystem.getAudioInputStream(path.toFile())) {
-      clip = AudioSystem.getClip();
-      clip.open(in);
+    public void load(Path path) throws IOException, UnsupportedAudioFileException, LineUnavailableException {
+        close();
+        try (AudioInputStream in = AudioSystem.getAudioInputStream(path.toFile())) {
+            clip = AudioSystem.getClip();
+            clip.open(in);
+        }
     }
-  }
 
-  public void play() {
-    if (clip != null) {
-      clip.start();
+    public void play() {
+        if (clip != null) {
+            clip.start();
+        }
     }
-  }
 
-  public void pause() {
-    if (clip != null) {
-      clip.stop();
+    public void pause() {
+        if (clip != null) {
+            clip.stop();
+        }
     }
-  }
 
-  /** Position de lecture courante, en secondes. */
-  public double position() {
-    return clip == null ? 0 : clip.getMicrosecondPosition() / 1_000_000.0;
-  }
-
-  /** Durée totale, en secondes. */
-  public double length() {
-    return clip == null ? 0 : clip.getMicrosecondLength() / 1_000_000.0;
-  }
-
-  public void seek(double seconds) {
-    if (clip != null) {
-      double clamped = Math.max(0, Math.min(length(), seconds));
-      clip.setMicrosecondPosition((long) (clamped * 1_000_000.0));
+    /** Position de lecture courante, en secondes. */
+    public double position() {
+        return clip == null ? 0 : clip.getMicrosecondPosition() / 1_000_000.0;
     }
-  }
 
-  @Override
-  public void close() {
-    if (clip != null) {
-      clip.stop();
-      clip.close();
-      clip = null;
+    /** Durée totale, en secondes. */
+    public double length() {
+        return clip == null ? 0 : clip.getMicrosecondLength() / 1_000_000.0;
     }
-  }
+
+    public void seek(double seconds) {
+        if (clip != null) {
+            double clamped = Math.max(0, Math.min(length(), seconds));
+            clip.setMicrosecondPosition((long) (clamped * 1_000_000.0));
+        }
+    }
+
+    @Override
+    public void close() {
+        if (clip != null) {
+            clip.stop();
+            clip.close();
+            clip = null;
+        }
+    }
 }

@@ -18,29 +18,29 @@ import java.util.List;
  */
 public final class AxisTicks {
 
-  private AxisTicks() {}
+    private AxisTicks() {}
 
-  /** Position en pixels et valeur métier d'une graduation. */
-  public record Tick(double positionPx, double value) {}
+    /** Position en pixels et valeur métier d'une graduation. */
+    public record Tick(double positionPx, double value) {}
 
-  /**
-   * Énumère les ticks de la plage {@code [minValue, maxValue]} au pas {@code step}, sur une
-   * longueur {@code lengthPx}. Retourne une liste vide en cas de paramètres dégénérés ({@code step
-   * ≤ 0} ou {@code lengthPx ≤ 0}).
-   */
-  public static List<Tick> compute(double minValue, double maxValue, double step, double lengthPx) {
-    if (step <= 0 || lengthPx <= 0) {
-      return List.of();
+    /**
+     * Énumère les ticks de la plage {@code [minValue, maxValue]} au pas {@code step}, sur une
+     * longueur {@code lengthPx}. Retourne une liste vide en cas de paramètres dégénérés ({@code step
+     * ≤ 0} ou {@code lengthPx ≤ 0}).
+     */
+    public static List<Tick> compute(double minValue, double maxValue, double step, double lengthPx) {
+        if (step <= 0 || lengthPx <= 0) {
+            return List.of();
+        }
+        double range = maxValue - minValue;
+        int firstIndex = (int) Math.ceil(minValue / step);
+        int lastIndex = (int) Math.floor(maxValue / step);
+        List<Tick> ticks = new ArrayList<>(Math.max(0, lastIndex - firstIndex + 1));
+        for (int i = firstIndex; i <= lastIndex; i++) {
+            double value = i * step;
+            double frac = range > 0 ? (value - minValue) / range : 0;
+            ticks.add(new Tick(lengthPx * frac, value));
+        }
+        return ticks;
     }
-    double range = maxValue - minValue;
-    int firstIndex = (int) Math.ceil(minValue / step);
-    int lastIndex = (int) Math.floor(maxValue / step);
-    List<Tick> ticks = new ArrayList<>(Math.max(0, lastIndex - firstIndex + 1));
-    for (int i = firstIndex; i <= lastIndex; i++) {
-      double value = i * step;
-      double frac = range > 0 ? (value - minValue) / range : 0;
-      ticks.add(new Tick(lengthPx * frac, value));
-    }
-    return ticks;
-  }
 }

@@ -41,288 +41,277 @@ import javax.sound.sampled.UnsupportedAudioFileException;
 @SuppressWarnings({"PMD.GodClass", "PMD.NcssCount", "PMD.CyclomaticComplexity"})
 public final class AudioViewModel {
 
-  public static final double MIN_DB = -90.0;
-  public static final double MAX_DB = -10.0;
+    public static final double MIN_DB = -90.0;
+    public static final double MAX_DB = -10.0;
 
-  // ----- État réglable -----
-  private final ObjectProperty<Path> audioFile = new SimpleObjectProperty<>(this, "audioFile");
-  private final DoubleProperty timeZoom = new SimpleDoubleProperty(this, "timeZoom", 1);
-  private final DoubleProperty frequencyZoom = new SimpleDoubleProperty(this, "frequencyZoom", 1);
-  private final DoubleProperty timeExpansion =
-      new SimpleDoubleProperty(this, "timeExpansionFactor", 1);
+    // ----- État réglable -----
+    private final ObjectProperty<Path> audioFile = new SimpleObjectProperty<>(this, "audioFile");
+    private final DoubleProperty timeZoom = new SimpleDoubleProperty(this, "timeZoom", 1);
+    private final DoubleProperty frequencyZoom = new SimpleDoubleProperty(this, "frequencyZoom", 1);
+    private final DoubleProperty timeExpansion = new SimpleDoubleProperty(this, "timeExpansionFactor", 1);
 
-  // ----- Transport (playing/currentTime/duration + player + timer) délégué à PlaybackModel (#14)
-  // -----
-  private final PlaybackModel playback = new PlaybackModel();
+    // ----- Transport (playing/currentTime/duration + player + timer) délégué à PlaybackModel (#14)
+    // -----
+    private final PlaybackModel playback = new PlaybackModel();
 
-  // ----- État dérivé (lecture seule) -----
-  private final ReadOnlyObjectWrapper<AudioSample> sample =
-      new ReadOnlyObjectWrapper<>(this, "sample");
-  private final ReadOnlyObjectWrapper<WritableImage> spectrogramImage =
-      new ReadOnlyObjectWrapper<>(this, "spectrogramImage");
-  private final ReadOnlyDoubleWrapper sonoScale = new ReadOnlyDoubleWrapper(this, "sonoScale", 1);
-  private final ReadOnlyStringWrapper timeText =
-      new ReadOnlyStringWrapper(this, "timeText", "0.00 / 0.00 s");
+    // ----- État dérivé (lecture seule) -----
+    private final ReadOnlyObjectWrapper<AudioSample> sample = new ReadOnlyObjectWrapper<>(this, "sample");
+    private final ReadOnlyObjectWrapper<WritableImage> spectrogramImage =
+            new ReadOnlyObjectWrapper<>(this, "spectrogramImage");
+    private final ReadOnlyDoubleWrapper sonoScale = new ReadOnlyDoubleWrapper(this, "sonoScale", 1);
+    private final ReadOnlyStringWrapper timeText = new ReadOnlyStringWrapper(this, "timeText", "0.00 / 0.00 s");
 
-  // null tant qu'aucune erreur de chargement ; renseigné quand la Task échoue, vidé au prochain
-  // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
-  private final ReadOnlyStringWrapper errorMessage =
-      new ReadOnlyStringWrapper(this, "errorMessage", null);
+    // null tant qu'aucune erreur de chargement ; renseigné quand la Task échoue, vidé au prochain
+    // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
+    private final ReadOnlyStringWrapper errorMessage = new ReadOnlyStringWrapper(this, "errorMessage", null);
 
-  // Fenêtre temporelle calculée (issue #23) : début et durée de la portion de signal affichée,
-  // dérivés de duration/currentTime/timeZoom. La vue s'y abonne pour redessiner le contenu
-  // (onde, viewport image, axes) uniquement quand la fenêtre change vraiment — au zoom 1 elle est
-  // constante pendant la lecture, donc seul le curseur (lié à currentTime) bouge.
-  private final DoubleBinding windowStartBinding =
-      Bindings.createDoubleBinding(
-          () -> windowStart(playback.duration(), playback.currentTime(), timeZoom.get()),
-          playback.durationProperty(),
-          playback.currentTimeProperty(),
-          timeZoom);
+    // Fenêtre temporelle calculée (issue #23) : début et durée de la portion de signal affichée,
+    // dérivés de duration/currentTime/timeZoom. La vue s'y abonne pour redessiner le contenu
+    // (onde, viewport image, axes) uniquement quand la fenêtre change vraiment — au zoom 1 elle est
+    // constante pendant la lecture, donc seul le curseur (lié à currentTime) bouge.
+    private final DoubleBinding windowStartBinding = Bindings.createDoubleBinding(
+            () -> windowStart(playback.duration(), playback.currentTime(), timeZoom.get()),
+            playback.durationProperty(),
+            playback.currentTimeProperty(),
+            timeZoom);
 
-  private final DoubleBinding windowDurationBinding =
-      Bindings.createDoubleBinding(
-          () -> windowDuration(playback.duration(), timeZoom.get()),
-          playback.durationProperty(),
-          timeZoom);
+    private final DoubleBinding windowDurationBinding = Bindings.createDoubleBinding(
+            () -> windowDuration(playback.duration(), timeZoom.get()), playback.durationProperty(), timeZoom);
 
-  // Conservés pour reconstruire l'image du spectrogramme quand la colormap change (bascule thème).
-  private Spectrogram spectrogram;
-  private Colormap colormap = Colormap.SOMBRE;
+    // Conservés pour reconstruire l'image du spectrogramme quand la colormap change (bascule thème).
+    private Spectrogram spectrogram;
+    private Colormap colormap = Colormap.SOMBRE;
 
-  public AudioViewModel() {
-    audioFile.addListener((o, oldFile, newFile) -> loadAudio(newFile));
-    playback.currentTimeProperty().addListener((o, a, b) -> updateTimeText());
-    playback.durationProperty().addListener((o, a, b) -> updateTimeText());
-    timeExpansion.addListener((o, a, b) -> updateTimeText());
-  }
-
-  // ----- Commandes (déléguées au PlaybackModel) -----
-
-  public void togglePlay() {
-    playback.togglePlay();
-  }
-
-  /** Positionne la lecture (temps fichier, en secondes), borné à [0, durée]. */
-  public void seek(double tFile) {
-    playback.seek(tFile);
-  }
-
-  public void dispose() {
-    playback.dispose();
-  }
-
-  // ----- Chargement (orchestration) -----
-
-  private void loadAudio(Path path) {
-    playback.reset();
-    sample.set(null);
-    spectrogramImage.set(null);
-    spectrogram = null;
-    sonoScale.set(1);
-    errorMessage.set(null);
-    if (path == null) {
-      return;
+    public AudioViewModel() {
+        audioFile.addListener((o, oldFile, newFile) -> loadAudio(newFile));
+        playback.currentTimeProperty().addListener((o, a, b) -> updateTimeText());
+        playback.durationProperty().addListener((o, a, b) -> updateTimeText());
+        timeExpansion.addListener((o, a, b) -> updateTimeText());
     }
 
-    Task<AudioAnalyzer.AnalyzedAudio> task =
-        new Task<>() {
-          @Override
-          protected AudioAnalyzer.AnalyzedAudio call() throws Exception {
-            return AudioAnalyzer.analyze(path);
-          }
+    // ----- Commandes (déléguées au PlaybackModel) -----
+
+    public void togglePlay() {
+        playback.togglePlay();
+    }
+
+    /** Positionne la lecture (temps fichier, en secondes), borné à [0, durée]. */
+    public void seek(double tFile) {
+        playback.seek(tFile);
+    }
+
+    public void dispose() {
+        playback.dispose();
+    }
+
+    // ----- Chargement (orchestration) -----
+
+    private void loadAudio(Path path) {
+        playback.reset();
+        sample.set(null);
+        spectrogramImage.set(null);
+        spectrogram = null;
+        sonoScale.set(1);
+        errorMessage.set(null);
+        if (path == null) {
+            return;
+        }
+
+        Task<AudioAnalyzer.AnalyzedAudio> task = new Task<>() {
+            @Override
+            protected AudioAnalyzer.AnalyzedAudio call() throws Exception {
+                return AudioAnalyzer.analyze(path);
+            }
         };
-    task.setOnSucceeded(
-        e -> {
-          AudioAnalyzer.AnalyzedAudio result = task.getValue();
-          spectrogram = result.spectrogram();
-          sample.set(result.sample());
-          sonoScale.set(result.sonoScale());
-          spectrogramImage.set(
-              SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
-          // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
-          frequencyZoom.set(result.suggestedFrequencyZoom());
-          playback.loadFile(path);
-          playback.setDuration(result.durationSeconds());
+        task.setOnSucceeded(e -> {
+            AudioAnalyzer.AnalyzedAudio result = task.getValue();
+            spectrogram = result.spectrogram();
+            sample.set(result.sample());
+            sonoScale.set(result.sonoScale());
+            spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
+            // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
+            frequencyZoom.set(result.suggestedFrequencyZoom());
+            playback.loadFile(path);
+            playback.setDuration(result.durationSeconds());
         });
-    // Sans cet onFailed, une Task qui échoue (WAV corrompu, format inattendu…) laissait le
-    // composant vide en silence, sans aucun retour pour l'utilisateur (issue #22).
-    task.setOnFailed(e -> errorMessage.set(formatLoadError(task.getException())));
+        // Sans cet onFailed, une Task qui échoue (WAV corrompu, format inattendu…) laissait le
+        // composant vide en silence, sans aucun retour pour l'utilisateur (issue #22).
+        task.setOnFailed(e -> errorMessage.set(formatLoadError(task.getException())));
 
-    Thread worker = new Thread(task, "audio-view-loader");
-    worker.setDaemon(true);
-    worker.start();
-  }
-
-  /** Traduit en français les causes d'échec courantes de {@link AudioSample#load}. */
-  public static String formatLoadError(Throwable cause) {
-    if (cause instanceof UnsupportedAudioFileException) {
-      return "Fichier audio non pris en charge (WAV PCM 16 bits attendu).";
+        Thread worker = new Thread(task, "audio-view-loader");
+        worker.setDaemon(true);
+        worker.start();
     }
-    if (cause instanceof IOException) {
-      return "Impossible de lire le fichier audio.";
+
+    /** Traduit en français les causes d'échec courantes de {@link AudioSample#load}. */
+    public static String formatLoadError(Throwable cause) {
+        if (cause instanceof UnsupportedAudioFileException) {
+            return "Fichier audio non pris en charge (WAV PCM 16 bits attendu).";
+        }
+        if (cause instanceof IOException) {
+            return "Impossible de lire le fichier audio.";
+        }
+        String msg = cause == null ? null : cause.getMessage();
+        return "Erreur de chargement" + (msg != null ? " : " + msg : ".");
     }
-    String msg = cause == null ? null : cause.getMessage();
-    return "Erreur de chargement" + (msg != null ? " : " + msg : ".");
-  }
 
-  private void updateTimeText() {
-    timeText.set(formatTimeText(playback.currentTime(), playback.duration(), expansionFactor()));
-  }
-
-  // ----- Calculs purs (testables sans interface) -----
-
-  public double expansionFactor() {
-    double f = timeExpansion.get();
-    return f > 0 ? f : 1;
-  }
-
-  public double windowDuration() {
-    return windowDuration(playback.duration(), timeZoom.get());
-  }
-
-  public double windowStart() {
-    return windowStart(playback.duration(), playback.currentTime(), timeZoom.get());
-  }
-
-  /**
-   * Binding observable de {@link #windowStart()} (déclenche un redessin quand la fenêtre bouge).
-   */
-  public DoubleBinding windowStartBinding() {
-    return windowStartBinding;
-  }
-
-  /** Binding observable de {@link #windowDuration()} (idem). */
-  public DoubleBinding windowDurationBinding() {
-    return windowDurationBinding;
-  }
-
-  public static double windowDuration(double dur, double timeZoom) {
-    return dur <= 0 ? 0 : dur / Math.max(1, timeZoom);
-  }
-
-  public static double windowStart(double dur, double current, double timeZoom) {
-    double win = windowDuration(dur, timeZoom);
-    if (win <= 0) {
-      return 0;
+    private void updateTimeText() {
+        timeText.set(formatTimeText(playback.currentTime(), playback.duration(), expansionFactor()));
     }
-    double start = current - win / 2;
-    return Math.max(0, Math.min(dur - win, start));
-  }
 
-  public static String formatTimeText(double currentFile, double durationFile, double factor) {
-    double f = factor > 0 ? factor : 1;
-    return String.format("%.2f / %.2f s", currentFile / f, durationFile / f);
-  }
+    // ----- Calculs purs (testables sans interface) -----
 
-  /** Pas de graduation « rond » (1, 2, 5 × 10^k) couvrant range avec ~target intervalles. */
-  public static double niceStep(double range, int target) {
-    if (range <= 0 || target <= 0) {
-      return 1;
+    public double expansionFactor() {
+        double f = timeExpansion.get();
+        return f > 0 ? f : 1;
     }
-    double raw = range / target;
-    double mag = Math.pow(10, Math.floor(Math.log10(raw)));
-    double norm = raw / mag;
-    double step;
-    if (norm < 1.5) {
-      step = 1;
-    } else if (norm < 3) {
-      step = 2;
-    } else if (norm < 7) {
-      step = 5;
-    } else {
-      step = 10;
+
+    public double windowDuration() {
+        return windowDuration(playback.duration(), timeZoom.get());
     }
-    return step * mag;
-  }
 
-  public static String formatAxis(double value, double step) {
-    int decimals = step >= 1 ? 0 : (int) Math.min(3, Math.ceil(-Math.log10(step)));
-    return String.format("%." + decimals + "f", value);
-  }
-
-  /** Change la colormap active et reconstruit l'image du spectrogramme si un fichier est chargé. */
-  public void setColormap(Colormap colormap) {
-    if (this.colormap == colormap) {
-      return;
+    public double windowStart() {
+        return windowStart(playback.duration(), playback.currentTime(), timeZoom.get());
     }
-    this.colormap = colormap;
-    if (spectrogram != null) {
-      spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
+
+    /**
+     * Binding observable de {@link #windowStart()} (déclenche un redessin quand la fenêtre bouge).
+     */
+    public DoubleBinding windowStartBinding() {
+        return windowStartBinding;
     }
-  }
 
-  // ----- Accesseurs (pour la vue) -----
+    /** Binding observable de {@link #windowDuration()} (idem). */
+    public DoubleBinding windowDurationBinding() {
+        return windowDurationBinding;
+    }
 
-  public ObjectProperty<Path> audioFileProperty() {
-    return audioFile;
-  }
+    public static double windowDuration(double dur, double timeZoom) {
+        return dur <= 0 ? 0 : dur / Math.max(1, timeZoom);
+    }
 
-  public BooleanProperty playingProperty() {
-    return playback.playingProperty();
-  }
+    public static double windowStart(double dur, double current, double timeZoom) {
+        double win = windowDuration(dur, timeZoom);
+        if (win <= 0) {
+            return 0;
+        }
+        double start = current - win / 2;
+        return Math.max(0, Math.min(dur - win, start));
+    }
 
-  public DoubleProperty timeZoomProperty() {
-    return timeZoom;
-  }
+    public static String formatTimeText(double currentFile, double durationFile, double factor) {
+        double f = factor > 0 ? factor : 1;
+        return String.format("%.2f / %.2f s", currentFile / f, durationFile / f);
+    }
 
-  public DoubleProperty frequencyZoomProperty() {
-    return frequencyZoom;
-  }
+    /** Pas de graduation « rond » (1, 2, 5 × 10^k) couvrant range avec ~target intervalles. */
+    public static double niceStep(double range, int target) {
+        if (range <= 0 || target <= 0) {
+            return 1;
+        }
+        double raw = range / target;
+        double mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        double norm = raw / mag;
+        double step;
+        if (norm < 1.5) {
+            step = 1;
+        } else if (norm < 3) {
+            step = 2;
+        } else if (norm < 7) {
+            step = 5;
+        } else {
+            step = 10;
+        }
+        return step * mag;
+    }
 
-  public DoubleProperty timeExpansionFactorProperty() {
-    return timeExpansion;
-  }
+    public static String formatAxis(double value, double step) {
+        int decimals = step >= 1 ? 0 : (int) Math.min(3, Math.ceil(-Math.log10(step)));
+        return String.format("%." + decimals + "f", value);
+    }
 
-  public ReadOnlyDoubleProperty currentTimeProperty() {
-    return playback.currentTimeProperty();
-  }
+    /** Change la colormap active et reconstruit l'image du spectrogramme si un fichier est chargé. */
+    public void setColormap(Colormap colormap) {
+        if (this.colormap == colormap) {
+            return;
+        }
+        this.colormap = colormap;
+        if (spectrogram != null) {
+            spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
+        }
+    }
 
-  public ReadOnlyDoubleProperty durationProperty() {
-    return playback.durationProperty();
-  }
+    // ----- Accesseurs (pour la vue) -----
 
-  public ReadOnlyObjectProperty<AudioSample> sampleProperty() {
-    return sample.getReadOnlyProperty();
-  }
+    public ObjectProperty<Path> audioFileProperty() {
+        return audioFile;
+    }
 
-  public ReadOnlyObjectProperty<WritableImage> spectrogramImageProperty() {
-    return spectrogramImage.getReadOnlyProperty();
-  }
+    public BooleanProperty playingProperty() {
+        return playback.playingProperty();
+    }
 
-  public ReadOnlyDoubleProperty sonoScaleProperty() {
-    return sonoScale.getReadOnlyProperty();
-  }
+    public DoubleProperty timeZoomProperty() {
+        return timeZoom;
+    }
 
-  public ReadOnlyStringProperty timeTextProperty() {
-    return timeText.getReadOnlyProperty();
-  }
+    public DoubleProperty frequencyZoomProperty() {
+        return frequencyZoom;
+    }
 
-  public ReadOnlyStringProperty errorMessageProperty() {
-    return errorMessage.getReadOnlyProperty();
-  }
+    public DoubleProperty timeExpansionFactorProperty() {
+        return timeExpansion;
+    }
 
-  public AudioSample getSample() {
-    return sample.get();
-  }
+    public ReadOnlyDoubleProperty currentTimeProperty() {
+        return playback.currentTimeProperty();
+    }
 
-  public WritableImage getSpectrogramImage() {
-    return spectrogramImage.get();
-  }
+    public ReadOnlyDoubleProperty durationProperty() {
+        return playback.durationProperty();
+    }
 
-  public double getSonoScale() {
-    return sonoScale.get();
-  }
+    public ReadOnlyObjectProperty<AudioSample> sampleProperty() {
+        return sample.getReadOnlyProperty();
+    }
 
-  public double getCurrentTime() {
-    return playback.currentTime();
-  }
+    public ReadOnlyObjectProperty<WritableImage> spectrogramImageProperty() {
+        return spectrogramImage.getReadOnlyProperty();
+    }
 
-  public double getDuration() {
-    return playback.duration();
-  }
+    public ReadOnlyDoubleProperty sonoScaleProperty() {
+        return sonoScale.getReadOnlyProperty();
+    }
 
-  public double getFrequencyZoom() {
-    return frequencyZoom.get();
-  }
+    public ReadOnlyStringProperty timeTextProperty() {
+        return timeText.getReadOnlyProperty();
+    }
+
+    public ReadOnlyStringProperty errorMessageProperty() {
+        return errorMessage.getReadOnlyProperty();
+    }
+
+    public AudioSample getSample() {
+        return sample.get();
+    }
+
+    public WritableImage getSpectrogramImage() {
+        return spectrogramImage.get();
+    }
+
+    public double getSonoScale() {
+        return sonoScale.get();
+    }
+
+    public double getCurrentTime() {
+        return playback.currentTime();
+    }
+
+    public double getDuration() {
+        return playback.duration();
+    }
+
+    public double getFrequencyZoom() {
+        return frequencyZoom.get();
+    }
 }

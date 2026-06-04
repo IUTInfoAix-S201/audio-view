@@ -14,33 +14,32 @@ import javafx.scene.image.WritableImage;
  */
 public final class SpectrogramImageFactory {
 
-  private SpectrogramImageFactory() {}
+    private SpectrogramImageFactory() {}
 
-  /**
-   * Construit l'image du spectrogramme. La hauteur de l'image est le nombre de bins (haute
-   * fréquence en haut), la largeur est le nombre de trames.
-   *
-   * @throws IllegalArgumentException si {@code minDb >= maxDb} (plage de normalisation invalide)
-   */
-  public static WritableImage build(
-      Spectrogram spec, Colormap colormap, double minDb, double maxDb) {
-    if (minDb >= maxDb) {
-      throw new IllegalArgumentException("minDb doit être strictement inférieur à maxDb");
+    /**
+     * Construit l'image du spectrogramme. La hauteur de l'image est le nombre de bins (haute
+     * fréquence en haut), la largeur est le nombre de trames.
+     *
+     * @throws IllegalArgumentException si {@code minDb >= maxDb} (plage de normalisation invalide)
+     */
+    public static WritableImage build(Spectrogram spec, Colormap colormap, double minDb, double maxDb) {
+        if (minDb >= maxDb) {
+            throw new IllegalArgumentException("minDb doit être strictement inférieur à maxDb");
+        }
+        int w = Math.max(1, spec.frameCount());
+        int h = Math.max(1, spec.binCount());
+        WritableImage img = new WritableImage(w, h);
+        PixelWriter pw = img.getPixelWriter();
+        double range = maxDb - minDb;
+        for (int x = 0; x < spec.frameCount(); x++) {
+            for (int y = 0; y < h; y++) {
+                int bin = h - 1 - y; // basses fréquences en bas
+                double db = spec.magnitudeDb(x, bin);
+                double norm = (db - minDb) / range;
+                norm = Math.max(0, Math.min(1, norm));
+                pw.setColor(x, y, colormap.at(norm));
+            }
+        }
+        return img;
     }
-    int w = Math.max(1, spec.frameCount());
-    int h = Math.max(1, spec.binCount());
-    WritableImage img = new WritableImage(w, h);
-    PixelWriter pw = img.getPixelWriter();
-    double range = maxDb - minDb;
-    for (int x = 0; x < spec.frameCount(); x++) {
-      for (int y = 0; y < h; y++) {
-        int bin = h - 1 - y; // basses fréquences en bas
-        double db = spec.magnitudeDb(x, bin);
-        double norm = (db - minDb) / range;
-        norm = Math.max(0, Math.min(1, norm));
-        pw.setColor(x, y, colormap.at(norm));
-      }
-    }
-    return img;
-  }
 }

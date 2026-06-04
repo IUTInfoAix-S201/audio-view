@@ -24,43 +24,43 @@ import org.testfx.util.WaitForAsyncUtils;
  */
 class AudioViewTest extends ApplicationTest {
 
-  private AudioView view;
+    private AudioView view;
 
-  @Override
-  public void start(Stage stage) {
-    view = new AudioView();
-    stage.setScene(new Scene(view, 640, 360));
-    stage.show();
-  }
-
-  @Test
-  void chargeUnWavEtPublieLaDuree() throws Exception {
-    Path wav = ecrireSinusWav(38_400f, 1.0); // 1 seconde a 38,4 kHz
-
-    interact(() -> view.setAudioFile(wav));
-    WaitForAsyncUtils.waitForFxEvents();
-    // Le decodage et la FFT sont asynchrones : on attend la mise a jour de la duree.
-    WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.getDuration() > 0.0);
-
-    assertThat(view.getDuration()).isCloseTo(1.0, Offset.offset(0.1));
-    assertThat(view.getCurrentTime()).isEqualTo(0.0);
-  }
-
-  private static Path ecrireSinusWav(float sampleRate, double seconds) throws IOException {
-    int n = (int) (sampleRate * seconds);
-    byte[] data = new byte[n * 2];
-    for (int i = 0; i < n; i++) {
-      double t = i / (double) sampleRate;
-      short s = (short) (Math.sin(2 * Math.PI * 4000 * t) * 12_000);
-      data[i * 2] = (byte) (s & 0xFF);
-      data[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
+    @Override
+    public void start(Stage stage) {
+        view = new AudioView();
+        stage.setScene(new Scene(view, 640, 360));
+        stage.show();
     }
-    AudioFormat fmt = new AudioFormat(sampleRate, 16, 1, true, false);
-    Path out = Files.createTempFile("audioview-test", ".wav");
-    try (AudioInputStream ais = new AudioInputStream(new ByteArrayInputStream(data), fmt, n)) {
-      AudioSystem.write(ais, AudioFileFormat.Type.WAVE, out.toFile());
+
+    @Test
+    void chargeUnWavEtPublieLaDuree() throws Exception {
+        Path wav = ecrireSinusWav(38_400f, 1.0); // 1 seconde a 38,4 kHz
+
+        interact(() -> view.setAudioFile(wav));
+        WaitForAsyncUtils.waitForFxEvents();
+        // Le decodage et la FFT sont asynchrones : on attend la mise a jour de la duree.
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.getDuration() > 0.0);
+
+        assertThat(view.getDuration()).isCloseTo(1.0, Offset.offset(0.1));
+        assertThat(view.getCurrentTime()).isEqualTo(0.0);
     }
-    out.toFile().deleteOnExit();
-    return out;
-  }
+
+    private static Path ecrireSinusWav(float sampleRate, double seconds) throws IOException {
+        int n = (int) (sampleRate * seconds);
+        byte[] data = new byte[n * 2];
+        for (int i = 0; i < n; i++) {
+            double t = i / (double) sampleRate;
+            short s = (short) (Math.sin(2 * Math.PI * 4000 * t) * 12_000);
+            data[i * 2] = (byte) (s & 0xFF);
+            data[i * 2 + 1] = (byte) ((s >> 8) & 0xFF);
+        }
+        AudioFormat fmt = new AudioFormat(sampleRate, 16, 1, true, false);
+        Path out = Files.createTempFile("audioview-test", ".wav");
+        try (AudioInputStream ais = new AudioInputStream(new ByteArrayInputStream(data), fmt, n)) {
+            AudioSystem.write(ais, AudioFileFormat.Type.WAVE, out.toFile());
+        }
+        out.toFile().deleteOnExit();
+        return out;
+    }
 }
