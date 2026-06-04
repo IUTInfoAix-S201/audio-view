@@ -32,25 +32,37 @@ fréquence en kHz) et légende d'intensité (dB). Capture issue de l'application
 - Une **API 100 % observable** : on lie ses propriétés (`currentTime`, `duration`, `playing`…) au
   reste de l'IHM ; décodage, FFT et lecture restent une **boîte noire**.
 
-## Distribution via JitPack
+## Distribution (Maven Central)
 
-Le composant est publié sur [JitPack](https://jitpack.io) à partir d'un tag Git. Aucune
-authentification n'est nécessaire côté étudiant pour un dépôt public.
+Le composant est publié sur **[Maven Central](https://central.sonatype.com/artifact/fr.nedjar.vigiechiro/audio-view)**
+sous le groupId maîtrisé `fr.nedjar.vigiechiro`. Il reste aussi servi par
+[JitPack](https://jitpack.io) (canal historique, sans authentification).
 
 ### Publier une version (équipe pédagogique)
 
 La publication est **automatique** : il suffit de **pousser sur `main`** avec des messages au format
 [Conventional Commits](https://www.conventionalcommits.org). Le workflow `release`
 ([semantic-release](https://semantic-release.gitbook.io)) calcule la version (`feat:` → mineure,
-`fix:` → patch, `BREAKING CHANGE:` → majeure), crée le **tag `vX.Y.Z`** et la **release GitHub**, puis
-**smoke-teste / préchauffe JitPack** pour ce tag. Aucun `git tag` manuel.
+`fix:` → patch, `BREAKING CHANGE:` → majeure), crée le **tag `vX.Y.Z`** + la **release GitHub**, puis
+**publie l'artefact signé sur Maven Central**. Un préchauffage JitPack (non bloquant) réchauffe au
+passage le cache du canal secondaire. Aucun `git tag` ni déploiement manuel.
 
 Détails du processus dans [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Consommer le composant (template étudiant)
 
-Dans le `pom.xml` du template, ajouter le dépôt JitPack puis la dépendance. Le `groupId` est imposé
-par JitPack (`com.github.<organisation>`), l'`artifactId` est le nom du dépôt.
+Depuis Maven Central, **aucune configuration de dépôt** n'est nécessaire :
+
+```xml
+<dependency>
+  <groupId>fr.nedjar.vigiechiro</groupId>
+  <artifactId>audio-view</artifactId>
+  <version>1.12.0</version>
+</dependency>
+```
+
+<details>
+<summary>Variante JitPack (canal historique)</summary>
 
 ```xml
 <repositories>
@@ -63,9 +75,11 @@ par JitPack (`com.github.<organisation>`), l'`artifactId` est le nom du dépôt.
 <dependency>
   <groupId>com.github.IUTInfoAix-S201</groupId>
   <artifactId>audio-view</artifactId>
-  <version>v1.0.0</version>
+  <version>v1.12.0</version>
 </dependency>
 ```
+
+</details>
 
 > JavaFX est déclaré en `provided` dans le composant : c'est le template qui apporte JavaFX 25 et
 > gère les natifs par OS (via son `javafx-maven-plugin`). Le composant suit donc la version JavaFX
