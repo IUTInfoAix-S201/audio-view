@@ -47,6 +47,20 @@ public final class AudioPlayer implements AutoCloseable {
         }
     }
 
+    /**
+     * Rejoue depuis le début. {@code start()} seul ne relance pas un {@link Clip} arrivé à sa fin
+     * (piège classique de {@code javax.sound.sampled}) : il faut l'arrêter, vider son tampon, puis
+     * repositionner la tête avant de redémarrer. Utilisé pour le bouclage.
+     */
+    public void restart() {
+        if (clip != null) {
+            clip.stop();
+            clip.flush();
+            clip.setFramePosition(0);
+            clip.start();
+        }
+    }
+
     public void pause() {
         if (clip != null) {
             clip.stop();

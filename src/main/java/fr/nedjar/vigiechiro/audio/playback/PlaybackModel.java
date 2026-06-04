@@ -86,10 +86,9 @@ public final class PlaybackModel {
     void handleTick(double pos, boolean atEnd) {
         if (atEnd && duration.get() > 0) {
             if (loop.get()) {
-                // Un Clip arrêté en fin d'extrait ne redémarre pas sur un simple seek(0) : il faut
-                // relancer la lecture (sinon le curseur revient à 0 mais le son ne reboucle pas).
-                player.seek(0);
-                player.play();
+                // Un Clip arrivé à sa fin ne se relance pas avec seek(0)+start() (le son ne repart
+                // pas) : il faut l'arrêter, vider son tampon et repositionner (cf. restart()).
+                player.restart();
                 currentTime.set(0);
                 return;
             }
