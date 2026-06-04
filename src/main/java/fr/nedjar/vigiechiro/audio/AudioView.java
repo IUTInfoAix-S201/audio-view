@@ -296,6 +296,28 @@ public class AudioView extends BorderPane {
         vm.togglePlay();
     }
 
+    /// Lecture en boucle (issue #15). À `false` (défaut), la lecture **s'arrête** en fin
+    /// d'extrait — un clic suivant sur Lecture rejoue depuis zéro. À `true`, la lecture
+    /// **rejoue automatiquement** depuis zéro sans interruption.
+    ///
+    /// La propriété est modifiable à tout moment ; elle prend effet à la prochaine atteinte de
+    /// la fin de l'extrait.
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `false`
+    public final BooleanProperty loopProperty() {
+        return vm.loopProperty();
+    }
+
+    /// `true` si la lecture rejoue automatiquement en boucle.
+    public final boolean isLoop() {
+        return vm.loopProperty().get();
+    }
+
+    /// Active (`true`) ou désactive (`false`) la lecture en boucle. Voir [#loopProperty()].
+    public final void setLoop(boolean value) {
+        vm.loopProperty().set(value);
+    }
+
     /// Position courante du curseur dans le **temps du fichier**, en secondes.
     ///
     /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le

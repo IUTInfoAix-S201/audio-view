@@ -263,6 +263,10 @@ public final class AudioViewModel {
         return playback.playingProperty();
     }
 
+    public BooleanProperty loopProperty() {
+        return playback.loopProperty();
+    }
+
     public DoubleProperty timeZoomProperty() {
         return timeZoom;
     }

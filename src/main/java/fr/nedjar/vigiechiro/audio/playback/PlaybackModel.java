@@ -21,6 +21,7 @@ public final class PlaybackModel {
     private final AnimationTimer timer;
 
     private final BooleanProperty playing = new SimpleBooleanProperty(this, "playing", false);
+    private final BooleanProperty loop = new SimpleBooleanProperty(this, "loop", false);
     private final ReadOnlyDoubleWrapper currentTime = new ReadOnlyDoubleWrapper(this, "currentTime", 0);
     private final ReadOnlyDoubleWrapper duration = new ReadOnlyDoubleWrapper(this, "duration", 0);
 
@@ -29,13 +30,7 @@ public final class PlaybackModel {
         timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                double pos = player.position();
-                if (duration.get() > 0 && pos >= duration.get()) {
-                    currentTime.set(duration.get());
-                    playing.set(false);
-                    return;
-                }
-                currentTime.set(pos);
+                handleTick(player.position());
             }
         };
 
@@ -53,6 +48,25 @@ public final class PlaybackModel {
                 timer.stop();
             }
         });
+    }
+
+    /**
+     * Une tick du timer : si la position dépasse la durée et que {@code loop} est actif, repart à
+     * zéro et continue la lecture ; sinon, arrête. Extrait du timer pour pouvoir tester sans
+     * toolkit (le {@link AnimationTimer#start()} interne est toolkit-bound, pas cette méthode).
+     */
+    void handleTick(double pos) {
+        if (duration.get() > 0 && pos >= duration.get()) {
+            if (loop.get()) {
+                player.seek(0);
+                currentTime.set(0);
+                return;
+            }
+            currentTime.set(duration.get());
+            playing.set(false);
+            return;
+        }
+        currentTime.set(pos);
     }
 
     /** Réinitialise l'état de transport (à appeler avant un nouveau chargement). */
@@ -107,6 +121,18 @@ public final class PlaybackModel {
 
     public BooleanProperty playingProperty() {
         return playing;
+    }
+
+    public BooleanProperty loopProperty() {
+        return loop;
+    }
+
+    public boolean isLoop() {
+        return loop.get();
+    }
+
+    public void setLoop(boolean value) {
+        loop.set(value);
     }
 
     public ReadOnlyDoubleProperty currentTimeProperty() {

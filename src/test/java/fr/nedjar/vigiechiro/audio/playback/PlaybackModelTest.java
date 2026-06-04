@@ -79,4 +79,45 @@ class PlaybackModelTest {
 
         assertThat(m.playingProperty().get()).isFalse();
     }
+
+    @Test
+    void loopEstFauxParDefaut() {
+        // Comportement par défaut inchangé (issue #15).
+        PlaybackModel m = new PlaybackModel();
+        assertThat(m.isLoop()).isFalse();
+    }
+
+    @Test
+    void handleTickEnFinDExtraitSansLoopArreteLaLecture() {
+        // Sans loop : currentTime clamp à duration, playing repasse à false (état initial).
+        PlaybackModel m = new PlaybackModel();
+        m.setDuration(10);
+        m.handleTick(10);
+        assertThat(m.currentTime()).isEqualTo(10);
+        assertThat(m.isPlaying()).isFalse();
+    }
+
+    @Test
+    void handleTickEnFinDExtraitAvecLoopRevientAZero() {
+        // Avec loop=true : repart de zéro au lieu de s'arrêter (issue #15).
+        PlaybackModel m = new PlaybackModel();
+        m.setDuration(10);
+        m.setLoop(true);
+        m.handleTick(10);
+        assertThat(m.currentTime()).isZero();
+        assertThat(m.isLoop()).isTrue();
+    }
+
+    @Test
+    void handleTickEnCoursDeLectureMetAJourLaPosition() {
+        // Position au milieu de l'extrait : copiée dans currentTime, peu importe loop.
+        PlaybackModel m = new PlaybackModel();
+        m.setDuration(10);
+        m.handleTick(3.5);
+        assertThat(m.currentTime()).isEqualTo(3.5);
+
+        m.setLoop(true);
+        m.handleTick(7);
+        assertThat(m.currentTime()).isEqualTo(7);
+    }
 }
