@@ -4,14 +4,15 @@
 # GitHub (avec notes de version) en UN seul run, avec le GITHUB_TOKEN (pas de PAT,
 # pas de PR).
 #
-# Smoke-test + préchauffage JitPack : le plugin @semantic-release/exec (étape publish,
+# Préchauffage JitPack (NON BLOQUANT) : le plugin @semantic-release/exec (étape publish,
 # en dernier dans .releaserc.json) sonde l'artefact JitPack du tag fraîchement créé en
 # POLLING (JitPack build à la demande : il renvoie 404 tant que le tag n'est pas bâti,
-# ~90 s ; on réessaie toutes les 20 s jusqu'à ~10 min). Si JitPack n'arrive jamais à
-# servir le tag, le run vire au rouge ICI (au lieu qu'un étudiant tombe sur un 404 plus
-# tard) et le cache est chaud pour le premier vrai consommateur. On le fait dans CE job
-# (pas via un workflow "on: push: tags") car un tag créé par le GITHUB_TOKEN ne déclenche
-# pas d'autre workflow.
+# ~90 s ; on réessaie toutes les 20 s jusqu'à ~10 min) pour réchauffer le cache JitPack
+# (canal secondaire). En cas de 404 persistant, il émet un AVERTISSEMENT sans faire
+# échouer le run : la publication Maven Central (canal principal, étapes suivantes du job)
+# ne doit JAMAIS être bloquée par un aléa JitPack. On le fait dans CE job (pas via un
+# workflow "on: push: tags") car un tag créé par le GITHUB_TOKEN ne déclenche pas d'autre
+# workflow.
 #
 # Config minimale (.releaserc.json) : pas de commit de CHANGELOG sur main (les notes
 # vivent dans la release GitHub), donc aucun commit parasite.
