@@ -14,15 +14,21 @@ import javafx.scene.paint.Color;
  */
 public enum Colormap {
     /**
-     * Rampe sombre par défaut : fond ~#0b0f14 (identique au fond CSS de {@code
-     * .audio-view-plot-area}) → bleu → magenta → jaune (style magma). Le stop 0 colle au fond pour
-     * que les zones silencieuses du spectrogramme se fondent dans le fond du composant.
+     * Rampe sombre par défaut, fidèle à « inferno » de matplotlib (violet profond → magenta → orange
+     * → jaune pâle), perceptuellement uniforme. Le stop 0 est forcé sur le fond du composant ~#0b0f14
+     * (identique au fond CSS de {@code .audio-view-plot-area}) pour que le silence s'y fonde ; la
+     * plage basse-médiane monte vite en luminance, ce qui fait ressortir les signaux faibles — là où
+     * l'ancienne rampe 4 stops les noyait dans un violet trop sombre.
      */
     SOMBRE(new double[][] {
-        {0.00, 0.043, 0.059, 0.078},
-        {0.35, 0.20, 0.05, 0.45},
-        {0.70, 0.85, 0.15, 0.35},
-        {1.00, 1.00, 0.95, 0.30}
+        {0.00, 0.043, 0.059, 0.078}, // #0b0f14 fond du composant (le silence s'y fond)
+        {0.14, 0.110, 0.046, 0.230}, // violet profond
+        {0.28, 0.290, 0.047, 0.420}, // violet
+        {0.42, 0.473, 0.111, 0.428}, // #781c6d magenta-violet
+        {0.56, 0.683, 0.190, 0.361}, // #bb3754 magenta-rouge
+        {0.70, 0.865, 0.317, 0.226}, // #ed6925 orange
+        {0.85, 0.968, 0.561, 0.120}, // orange-jaune
+        {1.00, 0.988, 0.998, 0.645} // #fcffa4 jaune pâle
     }),
 
     /** Rampe claire : blanc cassé (assorti au fond CSS du thème clair) → bleu → violet sombre. */
