@@ -273,6 +273,14 @@ public final class AudioViewModel {
         return playback.normalisationProperty();
     }
 
+    public ReadOnlyDoubleProperty normalisationGainDbProperty() {
+        return playback.normalisationGainDbProperty();
+    }
+
+    public double getNormalisationGainDb() {
+        return playback.normalisationGainDb();
+    }
+
     public DoubleProperty timeZoomProperty() {
         return timeZoom;
     }

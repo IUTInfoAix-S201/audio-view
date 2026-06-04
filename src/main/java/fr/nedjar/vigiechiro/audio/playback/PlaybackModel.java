@@ -34,6 +34,9 @@ public final class PlaybackModel {
     private final BooleanProperty normalisation = new SimpleBooleanProperty(this, "normalisation", false);
     private final ReadOnlyDoubleWrapper currentTime = new ReadOnlyDoubleWrapper(this, "currentTime", 0);
     private final ReadOnlyDoubleWrapper duration = new ReadOnlyDoubleWrapper(this, "duration", 0);
+    // Gain de normalisation effectivement appliqué au rendu, en dB (0 si désactivé ou sans source) :
+    // exposé en lecture seule pour un retour visuel côté consommateur (issue #32).
+    private final ReadOnlyDoubleWrapper normalisationGainDb = new ReadOnlyDoubleWrapper(this, "normalisationGainDb", 0);
 
     // Source décodée courante (mono, normalisée [-1, 1]) + gain de normalisation pré-calculé : permet
     // de rouvrir le clip avec ou sans gain sur bascule de normalisation, sans re-décoder le fichier.
@@ -65,8 +68,12 @@ public final class PlaybackModel {
             }
         });
 
-        // Bascule de normalisation : rouvre le clip avec le gain adéquat (no-op sans source chargée).
-        normalisation.addListener((o, was, now) -> reopen());
+        // Bascule de normalisation : rouvre le clip avec le gain adéquat (no-op sans source chargée)
+        // et met à jour le gain exposé (dB).
+        normalisation.addListener((o, was, now) -> {
+            reopen();
+            updateGainDb();
+        });
     }
 
     /**
@@ -102,6 +109,13 @@ public final class PlaybackModel {
         sourceSamples = null;
         sourceRate = 0;
         normalisedGain = 1.0;
+        updateGainDb();
+    }
+
+    /** Recalcule le gain effectivement appliqué au rendu (en dB) : 0 dB si désactivé ou sans source. */
+    private void updateGainDb() {
+        double g = (sourceSamples != null && normalisation.get()) ? normalisedGain : 1.0;
+        normalisationGainDb.set(20.0 * Math.log10(g));
     }
 
     /**
@@ -114,6 +128,7 @@ public final class PlaybackModel {
         sourceRate = sampleRate;
         normalisedGain = AudioPlayer.peakGain(mono, NORMALISATION_CEILING, NORMALISATION_MAX_GAIN_DB);
         reopen();
+        updateGainDb();
     }
 
     /**
@@ -196,6 +211,14 @@ public final class PlaybackModel {
 
     public void setNormalisation(boolean value) {
         normalisation.set(value);
+    }
+
+    public ReadOnlyDoubleProperty normalisationGainDbProperty() {
+        return normalisationGainDb.getReadOnlyProperty();
+    }
+
+    public double normalisationGainDb() {
+        return normalisationGainDb.get();
     }
 
     public ReadOnlyDoubleProperty currentTimeProperty() {

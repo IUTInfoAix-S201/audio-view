@@ -2,6 +2,7 @@ package fr.nedjar.vigiechiro.audio.playback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.within;
 
 import org.junit.jupiter.api.Test;
 
@@ -109,6 +110,24 @@ class PlaybackModelTest {
     }
 
     @Test
+    void gainDbEstNulParDefautEtSuitLaNormalisation() {
+        // Gain exposé (dB) : 0 sans source, 0 normalisation OFF, +X dB quand ON. Calcul indépendant
+        // du périphérique audio (reopen avale l'échec, updateGainDb tourne quand même). Issue #32.
+        PlaybackModel m = new PlaybackModel();
+        assertThat(m.normalisationGainDb()).isZero();
+
+        m.loadSource(new float[] {0.1f, -0.05f}, 44_100f); // pic 0,1
+        assertThat(m.normalisationGainDb()).isZero(); // normalisation OFF → 0 dB
+
+        m.setNormalisation(true);
+        // gain = 0,97 / 0,1 = 9,7 → 20·log10(9,7) ≈ 19,73 dB
+        assertThat(m.normalisationGainDb()).isCloseTo(19.73, within(0.1));
+
+        m.setNormalisation(false);
+        assertThat(m.normalisationGainDb()).isZero();
+    }
+
+    @Test
     void loadSourceEtBasculeNeJettentPasMemeSansPeripheriqueAudio() {
         // loadSource pré-calcule le gain (peakGain) puis ouvre le clip en best-effort : sans carte
         // son, l'exception est avalée. Toggle ensuite : reopen() reste silencieux. L'affichage ne
@@ -118,7 +137,6 @@ class PlaybackModelTest {
                     m.loadSource(new float[] {0.1f, -0.2f, 0.05f}, 44_100f);
                     m.setNormalisation(true);
                     m.setNormalisation(false);
-                    m.dispose();
                 })
                 .doesNotThrowAnyException();
     }

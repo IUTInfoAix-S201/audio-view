@@ -58,6 +58,8 @@ class AudioViewApiTest {
             "normalisationProperty():javafx.beans.property.BooleanProperty",
             "isNormalisation():boolean",
             "setNormalisation(boolean):void",
+            "normalisationGainDbProperty():javafx.beans.property.ReadOnlyDoubleProperty",
+            "getNormalisationGainDb():double",
             "currentTimeProperty():javafx.beans.property.ReadOnlyDoubleProperty",
             "getCurrentTime():double",
             "durationProperty():javafx.beans.property.ReadOnlyDoubleProperty",

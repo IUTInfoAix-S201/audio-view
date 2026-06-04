@@ -399,6 +399,24 @@ public class AudioView extends BorderPane {
         vm.normalisationProperty().set(value);
     }
 
+    /// Gain de normalisation peak **effectivement appliqué** au rendu audio, en décibels.
+    ///
+    /// `0` dB quand la normalisation est désactivée ou qu'aucun fichier n'est chargé ; sinon la
+    /// valeur positive (boost) appliquée pour ramener le pic du fichier près du plein régime, par
+    /// ex. `+12.4`. Recalculée à chaque chargement et à chaque bascule de [#normalisationProperty()].
+    /// Utile pour donner un retour visuel (« Normalisé : +X dB ») à l'utilisateur, la normalisation
+    /// n'ayant par nature aucun effet sur les tracés.
+    ///
+    /// @return propriété lecture seule ; valeur par défaut `0`
+    public final ReadOnlyDoubleProperty normalisationGainDbProperty() {
+        return vm.normalisationGainDbProperty();
+    }
+
+    /// Gain de normalisation peak courant, en dB (`0` si désactivé).
+    public final double getNormalisationGainDb() {
+        return vm.getNormalisationGainDb();
+    }
+
     /// Position courante du curseur dans le **temps du fichier**, en secondes.
     ///
     /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le
