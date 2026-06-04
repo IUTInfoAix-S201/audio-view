@@ -46,6 +46,26 @@ class AudioViewTest extends ApplicationTest {
         assertThat(view.getCurrentTime()).isEqualTo(0.0);
     }
 
+    @Test
+    void readyEstFalseAvantChargementEtTrueQuandLaSTFTEstPrete() throws Exception {
+        // Signal canonique de fin de chargement (issue #31) : avant setAudioFile, ready=false ;
+        // après que la Task d'analyse termine, ready passe à true et tout l'état est en place
+        // (sample/spectrogramImage/duration), garanti pour un snapshot hors-écran.
+        assertThat(view.isReady()).isFalse();
+
+        Path wav = ecrireSinusWav(38_400f, 1.0);
+        interact(() -> view.setAudioFile(wav));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.isReady());
+
+        assertThat(view.isReady()).isTrue();
+        assertThat(view.getDuration()).isGreaterThan(0);
+
+        // Reset à false sur source nulle.
+        interact(() -> view.setAudioFile(null));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.isReady()).isFalse();
+    }
+
     private static Path ecrireSinusWav(float sampleRate, double seconds) throws IOException {
         int n = (int) (sampleRate * seconds);
         byte[] data = new byte[n * 2];

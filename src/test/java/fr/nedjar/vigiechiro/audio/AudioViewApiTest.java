@@ -70,6 +70,8 @@ class AudioViewApiTest {
             "setLightTheme(boolean):void",
             "errorMessageProperty():javafx.beans.property.ReadOnlyStringProperty",
             "getErrorMessage():java.lang.String",
+            "readyProperty():javafx.beans.property.ReadOnlyBooleanProperty",
+            "isReady():boolean",
             "dispose():void",
             "getClassCssMetaData():java.util.List<javafx.css.CssMetaData<? extends javafx.css.Styleable, ?>>",
             "getCssMetaData():java.util.List<javafx.css.CssMetaData<? extends javafx.css.Styleable, ?>>");

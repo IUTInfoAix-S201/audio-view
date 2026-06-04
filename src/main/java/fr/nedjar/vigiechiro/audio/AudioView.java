@@ -16,6 +16,7 @@ import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.css.CssMetaData;
@@ -238,8 +239,15 @@ public class AudioView extends BorderPane {
     ///
     /// Le décodage et la STFT sont lancés **en tâche de fond** dès qu'on assigne un chemin non
     /// nul : [#currentTimeProperty()] et [#durationProperty()] passent à 0, puis [#durationProperty()]
-    /// reçoit la durée du fichier quand l'analyse termine. Assigner `null` réinitialise le
-    /// composant. Une erreur de décodage est signalée via [#errorMessageProperty()].
+    /// reçoit la durée du fichier quand l'analyse termine. [#readyProperty()] passe à `true` une
+    /// fois tout en place — c'est **le signal canonique** pour les tests TestFX et les
+    /// snapshots hors-écran. Assigner `null` réinitialise le composant. Une erreur de décodage
+    /// est signalée via [#errorMessageProperty()].
+    ///
+    /// **Affichage découplé de la lecture** : si le périphérique audio est indisponible
+    /// (machine sans carte son, CI headless…), le décodage et l'affichage du sonogramme et du
+    /// spectrogramme fonctionnent quand même ; seule la commande Lecture sera silencieusement
+    /// sans effet.
     ///
     /// Format attendu : WAV PCM 16 bits mono. Tout autre format produit une erreur.
     ///
@@ -426,6 +434,28 @@ public class AudioView extends BorderPane {
     /// Message d'erreur courant, ou `null` si tout va bien.
     public final String getErrorMessage() {
         return vm.errorMessageProperty().get();
+    }
+
+    /// Signal canonique de **fin de chargement** (issue #31) : `false` tant que le décodage et
+    /// la STFT du fichier courant ne sont pas terminés, `true` une fois que `sample`, l'image du
+    /// spectrogramme, `duration` et le zoom fréquentiel par défaut sont en place.
+    ///
+    /// Conçu pour les tests TestFX et les **snapshots hors-écran** : avant `ready=true`,
+    /// `getDuration()` vaut encore `0` et les tracés sont vides ; après, un snapshot capture le
+    /// rendu final. Préférer cette propriété à `durationProperty() > 0` (plus sémantique et
+    /// stable).
+    ///
+    /// Reset à `false` à chaque `setAudioFile(...)` (y compris `null`). Si le chargement échoue,
+    /// `ready` reste `false` et [#errorMessageProperty()] est renseigné.
+    ///
+    /// @return propriété lecture seule ; valeur par défaut `false`
+    public final ReadOnlyBooleanProperty readyProperty() {
+        return vm.readyProperty();
+    }
+
+    /// `true` quand le fichier courant est entièrement décodé et prêt à être rendu.
+    public final boolean isReady() {
+        return vm.isReady();
     }
 
     private void applyTheme(boolean light) {

@@ -13,6 +13,8 @@ import javafx.beans.binding.DoubleBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.ReadOnlyBooleanProperty;
+import javafx.beans.property.ReadOnlyBooleanWrapper;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleWrapper;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -65,6 +67,11 @@ public final class AudioViewModel {
     // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
     private final ReadOnlyStringWrapper errorMessage = new ReadOnlyStringWrapper(this, "errorMessage", null);
 
+    // false tant que le décodage + STFT du fichier courant n'a pas abouti ; passe à true à la fin
+    // de Task.onSucceeded (signal canonique pour TestFX / snapshots hors-écran, issue #31). Reset
+    // à false au début de chaque (re)chargement et quand la source devient null.
+    private final ReadOnlyBooleanWrapper ready = new ReadOnlyBooleanWrapper(this, "ready", false);
+
     // Fenêtre temporelle calculée (issue #23) : début et durée de la portion de signal affichée,
     // dérivés de duration/currentTime/timeZoom. La vue s'y abonne pour redessiner le contenu
     // (onde, viewport image, axes) uniquement quand la fenêtre change vraiment — au zoom 1 elle est
@@ -113,6 +120,7 @@ public final class AudioViewModel {
         spectrogram = null;
         sonoScale.set(1);
         errorMessage.set(null);
+        ready.set(false);
         if (path == null) {
             return;
         }
@@ -133,6 +141,10 @@ public final class AudioViewModel {
             frequencyZoom.set(result.suggestedFrequencyZoom());
             playback.loadFile(path);
             playback.setDuration(result.durationSeconds());
+            // ready en DERNIER : le signal n'est émis qu'une fois TOUT en place (sample, image,
+            // duration, frequencyZoom calé) — les listeners qui prennent un snapshot voient déjà
+            // l'état final.
+            ready.set(true);
         });
         // Sans cet onFailed, une Task qui échoue (WAV corrompu, format inattendu…) laissait le
         // composant vide en silence, sans aucun retour pour l'utilisateur (issue #22).
@@ -289,6 +301,14 @@ public final class AudioViewModel {
 
     public ReadOnlyStringProperty errorMessageProperty() {
         return errorMessage.getReadOnlyProperty();
+    }
+
+    public ReadOnlyBooleanProperty readyProperty() {
+        return ready.getReadOnlyProperty();
+    }
+
+    public boolean isReady() {
+        return ready.get();
     }
 
     public AudioSample getSample() {
