@@ -622,7 +622,9 @@ public class AudioView extends BorderPane {
     /// Viridis) sinon Sombre / Clair selon `lightTheme`. Visible aux sous-vues via {@code bindTo}.
     private Colormap currentColormap() {
         if (colorblindFriendly.get()) {
-            return Colormap.VIRIDIS;
+            // Variante daltonien assortie au thème : fond clair en thème clair, fond sombre sinon
+            // (toutes deux CVD-safe et ancrées sur le fond pour le contraste).
+            return lightTheme.get() ? Colormap.VIRIDIS_CLAIR : Colormap.VIRIDIS;
         }
         return lightTheme.get() ? Colormap.CLAIR : Colormap.SOMBRE;
     }

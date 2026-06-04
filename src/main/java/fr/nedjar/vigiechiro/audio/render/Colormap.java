@@ -34,21 +34,35 @@ public enum Colormap {
     }),
 
     /**
-     * Rampe perceptuellement uniforme (style « Viridis » de matplotlib), conçue pour rester lisible
-     * avec les principales formes de daltonisme (deutéranopie, protanopie, tritanopie) — issue #24.
-     * Violet sombre → bleu → vert → jaune clair, monotone en luminance perçue. À privilégier comme
-     * variante d'accessibilité.
+     * Variante daltonien (issue #24) pour le <b>thème sombre</b> : teintes « Viridis » de matplotlib
+     * (lisibles avec deutéranopie/protanopie/tritanopie), mais <b>ancrées sur le fond ~#0b0f14</b> au
+     * stop 0 — le silence se fond dans le fond et les signaux faibles ressortent (contraste élevé),
+     * là où le bas violet de Viridis pur les noyait. Monotone en luminance perçue.
      */
     VIRIDIS(new double[][] {
-        {0.000, 0.267, 0.005, 0.329}, // #440154 violet sombre
-        {0.125, 0.283, 0.141, 0.458}, // #482a74
-        {0.250, 0.254, 0.265, 0.530}, // #414487
-        {0.375, 0.207, 0.372, 0.553}, // #355e8d bleu
-        {0.500, 0.164, 0.471, 0.558}, // #2a788e
-        {0.625, 0.128, 0.567, 0.551}, // #21918c teal
-        {0.750, 0.135, 0.659, 0.518}, // #22a884 vert
-        {0.875, 0.478, 0.821, 0.318}, // #7ad151 vert clair
-        {1.000, 0.993, 0.906, 0.144} // #fde725 jaune
+        {0.00, 0.043, 0.059, 0.078}, // #0b0f14 fond sombre (silence)
+        {0.10, 0.267, 0.005, 0.329}, // #440154 violet sombre
+        {0.22, 0.283, 0.141, 0.458}, // #482a74
+        {0.34, 0.254, 0.265, 0.530}, // #414487
+        {0.46, 0.207, 0.372, 0.553}, // #355e8d bleu
+        {0.58, 0.128, 0.567, 0.551}, // #21918c teal
+        {0.70, 0.135, 0.659, 0.518}, // #22a884 vert
+        {0.85, 0.478, 0.821, 0.318}, // #7ad151 vert clair
+        {1.00, 0.993, 0.906, 0.144} // #fde725 jaune
+    }),
+
+    /**
+     * Variante daltonien (issue #24) pour le <b>thème clair</b> : ancrée sur le fond clair ~#eef1f4
+     * (le silence se fond) puis descend en luminance par des teintes CVD-safe (bleu clair → teal →
+     * bleu → violet sombre) jusqu'au signal fort. Monotone décroissante en luminance, cohérente avec
+     * la chrome claire — contrairement au Viridis sombre qui jurait dans une fenêtre claire.
+     */
+    VIRIDIS_CLAIR(new double[][] {
+        {0.00, 0.933, 0.945, 0.957}, // ~#eef1f4 fond clair (silence)
+        {0.25, 0.470, 0.700, 0.800}, // bleu clair
+        {0.50, 0.130, 0.520, 0.620}, // teal-bleu
+        {0.75, 0.180, 0.280, 0.520}, // bleu sombre
+        {1.00, 0.267, 0.005, 0.329} // #440154 violet sombre (signal fort)
     });
 
     // Chaque ligne : {position dans [0,1], R, G, B}. Stops triés par position croissante.
