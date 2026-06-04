@@ -103,11 +103,9 @@ public class AudioView extends BorderPane {
         }
     };
 
-    /**
-     * Active le thème clair. Bascule la pseudo-classe CSS {@code :light} sur le composant ; tout le
-     * rendu (chrome et couleur du sonogramme) est alors pris dans les règles {@code
-     * .audio-view:light} de {@code audio-view.css}. Faux par défaut (thème sombre).
-     */
+    // Champ porteur de la propriété JavaFX "lightTheme". La Javadoc publique est sur
+    // lightThemeProperty() ; éviter de la dupliquer ici évite le warning javadoc
+    // "Duplicate comment for property".
     private final BooleanProperty lightTheme = new BooleanPropertyBase(false) {
         @Override
         protected void invalidated() {
@@ -125,8 +123,9 @@ public class AudioView extends BorderPane {
         }
     };
 
-    /// Force la palette daltonien-friendly (Viridis) quand `true`, défaut `false` (palettes
-    /// thématiques sombre/clair). Issue #24.
+    // Champ porteur de la propriété JavaFX "colorblindFriendly" (issue #24). La Javadoc publique
+    // est sur colorblindFriendlyProperty() ; éviter la duplication ici évite le warning javadoc
+    // "Duplicate comment for property".
     private final BooleanProperty colorblindFriendly = new BooleanPropertyBase(false) {
         @Override
         protected void invalidated() {
