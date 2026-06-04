@@ -370,6 +370,35 @@ public class AudioView extends BorderPane {
         vm.loopProperty().set(value);
     }
 
+    /// Normalisation **peak** du niveau sonore à la lecture (issue #32). À `false` (défaut), l'audio
+    /// est joué tel quel. À `true`, un **gain linéaire** est appliqué au rendu pour ramener le pic du
+    /// fichier près du plein régime, afin d'égaliser le volume d'un extrait à l'autre — les cris de
+    /// chiroptères ayant des amplitudes très variables.
+    ///
+    /// **Sans modifier le fichier** : seul le rendu est affecté (PCM recalculé en mémoire). La
+    /// normalisation peak est volontairement la méthode **la moins déformante** (gain constant, forme
+    /// d'onde préservée, pas de compression). La propriété est modifiable à tout moment ; la bascule
+    /// reprend la lecture là où elle en était.
+    ///
+    /// **Best-effort** : comme le reste de la lecture, sans effet si le périphérique audio est
+    /// indisponible (l'affichage, lui, reste fonctionnel).
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `false`
+    public final BooleanProperty normalisationProperty() {
+        return vm.normalisationProperty();
+    }
+
+    /// `true` si la normalisation peak est active.
+    public final boolean isNormalisation() {
+        return vm.normalisationProperty().get();
+    }
+
+    /// Active (`true`) ou désactive (`false`, défaut) la normalisation peak. Voir
+    /// [#normalisationProperty()].
+    public final void setNormalisation(boolean value) {
+        vm.normalisationProperty().set(value);
+    }
+
     /// Position courante du curseur dans le **temps du fichier**, en secondes.
     ///
     /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le
