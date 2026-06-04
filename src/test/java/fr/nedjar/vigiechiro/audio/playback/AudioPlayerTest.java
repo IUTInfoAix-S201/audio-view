@@ -17,6 +17,13 @@ class AudioPlayerTest {
     }
 
     @Test
+    void sansClipIsAtEndEstFaux() {
+        try (AudioPlayer p = new AudioPlayer()) {
+            assertThat(p.isAtEnd()).isFalse();
+        }
+    }
+
+    @Test
     void operationsSansClipSontSansEffetEtSansErreur() {
         AudioPlayer p = new AudioPlayer();
         assertThatCode(() -> {

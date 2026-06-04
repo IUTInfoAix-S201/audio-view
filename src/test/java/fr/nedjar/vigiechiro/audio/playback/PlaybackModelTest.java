@@ -143,10 +143,10 @@ class PlaybackModelTest {
 
     @Test
     void handleTickEnFinDExtraitSansLoopArreteLaLecture() {
-        // Sans loop : currentTime clamp à duration, playing repasse à false (état initial).
+        // Sans loop : en fin d'extrait, currentTime clamp à duration, playing repasse à false.
         PlaybackModel m = new PlaybackModel();
         m.setDuration(10);
-        m.handleTick(10);
+        m.handleTick(10, true);
         assertThat(m.currentTime()).isEqualTo(10);
         assertThat(m.isPlaying()).isFalse();
     }
@@ -157,7 +157,7 @@ class PlaybackModelTest {
         PlaybackModel m = new PlaybackModel();
         m.setDuration(10);
         m.setLoop(true);
-        m.handleTick(10);
+        m.handleTick(10, true);
         assertThat(m.currentTime()).isZero();
         assertThat(m.isLoop()).isTrue();
     }
@@ -167,11 +167,11 @@ class PlaybackModelTest {
         // Position au milieu de l'extrait : copiée dans currentTime, peu importe loop.
         PlaybackModel m = new PlaybackModel();
         m.setDuration(10);
-        m.handleTick(3.5);
+        m.handleTick(3.5, false);
         assertThat(m.currentTime()).isEqualTo(3.5);
 
         m.setLoop(true);
-        m.handleTick(7);
+        m.handleTick(7, false);
         assertThat(m.currentTime()).isEqualTo(7);
     }
 }

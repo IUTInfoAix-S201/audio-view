@@ -63,6 +63,16 @@ public final class AudioPlayer implements AutoCloseable {
         return clip == null ? 0 : clip.getMicrosecondLength() / 1_000_000.0;
     }
 
+    /**
+     * {@code true} si la lecture a atteint la fin de l'extrait. Comparé sur les durées <b>internes au
+     * Clip</b> (mêmes unités), donc fiable — contrairement à un test {@code position ≥ durée} où la
+     * durée provient d'un calcul flottant séparé : l'arrondi microseconde fait plafonner la position
+     * un cheveu sous la durée, et la condition ne se déclenche jamais.
+     */
+    public boolean isAtEnd() {
+        return clip != null && clip.getMicrosecondPosition() >= clip.getMicrosecondLength();
+    }
+
     public void seek(double seconds) {
         if (clip != null) {
             double clamped = Math.max(0, Math.min(length(), seconds));

@@ -49,7 +49,7 @@ public final class PlaybackModel {
         timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                handleTick(player.position());
+                handleTick(player.position(), player.isAtEnd());
             }
         };
 
@@ -77,12 +77,14 @@ public final class PlaybackModel {
     }
 
     /**
-     * Une tick du timer : si la position dépasse la durée et que {@code loop} est actif, repart à
-     * zéro et continue la lecture ; sinon, arrête. Extrait du timer pour pouvoir tester sans
-     * toolkit (le {@link AnimationTimer#start()} interne est toolkit-bound, pas cette méthode).
+     * Une tick du timer : si la fin de l'extrait est atteinte ({@code atEnd}, fourni par {@link
+     * AudioPlayer#isAtEnd()}) et que {@code loop} est actif, repart à zéro et relance la lecture ;
+     * sinon, arrête. Hors fin, recopie simplement la position dans {@code currentTime}. Extrait du
+     * timer pour pouvoir tester sans toolkit (le {@link AnimationTimer#start()} interne est
+     * toolkit-bound, pas cette méthode).
      */
-    void handleTick(double pos) {
-        if (duration.get() > 0 && pos >= duration.get()) {
+    void handleTick(double pos, boolean atEnd) {
+        if (atEnd && duration.get() > 0) {
             if (loop.get()) {
                 // Un Clip arrêté en fin d'extrait ne redémarre pas sur un simple seek(0) : il faut
                 // relancer la lecture (sinon le curseur revient à 0 mais le son ne reboucle pas).
