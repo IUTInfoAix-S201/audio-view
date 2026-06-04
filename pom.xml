@@ -11,6 +11,38 @@
 
   <name>VigieChiro Audio View</name>
   <description>Composant JavaFX sonogramme + spectrogramme pour fichiers WAV (SAE 2.01).</description>
+  <url>https://github.com/IUTInfoAix-S201/audio-view</url>
+
+  <!-- Métadonnées exigées par Maven Central (cf. profil "release" + maven-gpg-plugin). -->
+  <licenses>
+    <license>
+      <name>MIT License</name>
+      <url>https://opensource.org/licenses/MIT</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <organization>
+    <name>IUT d'Aix-Marseille — SAÉ 2.01 VigieChiro PR Companion</name>
+    <url>https://iut.univ-amu.fr/</url>
+  </organization>
+
+  <developers>
+    <developer>
+      <id>nedseb</id>
+      <name>Sébastien NEDJAR</name>
+      <email>sebastien.nedjar@univ-amu.fr</email>
+      <organization>IUT d'Aix-Marseille</organization>
+      <organizationUrl>https://iut.univ-amu.fr/</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/IUTInfoAix-S201/audio-view.git</connection>
+    <developerConnection>scm:git:git@github.com:IUTInfoAix-S201/audio-view.git</developerConnection>
+    <url>https://github.com/IUTInfoAix-S201/audio-view</url>
+    <tag>HEAD</tag>
+  </scm>
 
   <properties>
     <maven.compiler.release>25</maven.compiler.release>
@@ -407,6 +439,85 @@
       <properties>
         <javafx.platform>win</javafx.platform>
       </properties>
+    </profile>
+
+    <!-- Pipeline de publication Maven Central (issue #25). Activé via "./mvnw -Prelease deploy"
+         depuis la CI (cf. .github/workflows/release.yml), quand semantic-release a tagué une
+         version. Produit : jar + -sources + -javadoc, tous signés GPG ; envoi vers Sonotype
+         Central via le central-publishing-maven-plugin (auto-publish).
+
+         Prérequis utilisateur (cf. CONTRIBUTING.md) :
+         - Compte Sonatype Central + namespace fr.nedjar.vigiechiro vérifié (TXT DNS).
+         - Clé GPG publiée sur keys.openpgp.org.
+         - Secrets GitHub : CENTRAL_USERNAME, CENTRAL_PASSWORD, GPG_PRIVATE_KEY, GPG_PASSPHRASE. -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>3.3.1</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals><goal>jar-no-fork</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>3.11.1</version>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals><goal>jar</goal></goals>
+              </execution>
+            </executions>
+            <configuration>
+              <!-- /// JEP 467 : doclint strict refuserait. On l'assouplit ; les warnings
+                   éventuels ne bloquent pas la release. -->
+              <doclint>none</doclint>
+              <source>25</source>
+              <quiet>true</quiet>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+                <configuration>
+                  <!-- Passphrase passée via GPG_PASSPHRASE (settings.xml.template), mode batch. -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>0.8.0</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
 </project>

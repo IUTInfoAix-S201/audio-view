@@ -121,3 +121,54 @@ Aucun `git tag` manuel. Sur **push sur `main`**, le workflow `release` (semantic
 Ensuite, pour propager au demo : bumper `audio.view.version` (→ le nouveau `vX.Y.Z`) dans son
 `pom.xml`, committer (`feat:`/`chore:`) et pousser. (Tant que le tag n'est pas publié sur JitPack, le
 demo ne compile pas contre une API qui n'y existe pas encore.)
+
+## Publication Maven Central (optionnelle)
+
+JitPack reste la voie principale (étudiants, demo). Maven Central est une voie supplémentaire pour
+une diffusion plus large (autres consommateurs Java/Maven sans avoir à ajouter le repo JitPack).
+
+La **plomberie est en place** (issue #25) — profil Maven `release` (sources jar, javadoc jar, GPG
+sign, `central-publishing-maven-plugin`) + step CI conditionnel dans `release.yml`. Le déploiement
+s'active **dès que les secrets sont fournis**, sans toucher au code.
+
+### Actions externes à faire une fois (côté mainteneur)
+
+1. **Compte Sonatype Central** : créer un compte sur <https://central.sonatype.com>.
+2. **Vérifier le namespace `fr.nedjar.vigiechiro`** : Central demande de prouver la propriété du
+   domaine par un TXT DNS (token fourni par le portail). Une fois validé, le namespace passe en
+   « verified » et autorise les déploiements.
+3. **Générer un *user token*** sur le portail (Account → User Token) : récupérer `username` /
+   `password` (différents de l'identifiant Sonatype).
+4. **Générer une clé GPG** dédiée au projet (RSA 4096, sans expiration ou ≥ 4 ans) :
+   ```sh
+   gpg --full-generate-key
+   gpg --armor --export-secret-keys <KEY_ID> > private.asc   # ne pas committer !
+   ```
+5. **Publier la clé publique** sur un keyserver reconnu par Central :
+   ```sh
+   gpg --keyserver keys.openpgp.org --send-keys <KEY_ID>
+   ```
+6. **Ajouter les 4 secrets GitHub** dans les *repository settings* du dépôt
+   `IUTInfoAix-S201/audio-view` :
+   - `CENTRAL_USERNAME` — l'username du user token Sonatype
+   - `CENTRAL_PASSWORD` — le password du user token Sonatype
+   - `GPG_PRIVATE_KEY` — contenu de `private.asc` (bloc `-----BEGIN PGP PRIVATE KEY BLOCK-----` …
+     `-----END PGP PRIVATE KEY BLOCK-----`)
+   - `GPG_PASSPHRASE` — la passphrase de la clé
+
+### Déclenchement
+
+Une fois les secrets en place, **rien à faire de plus** : à chaque release `feat:`/`fix:` poussée
+sur `main`, le workflow `release.yml` :
+
+1. fait son travail habituel (semantic-release tag + GitHub release + smoke-test JitPack) ;
+2. détecte qu'un tag vient d'être créé ;
+3. importe la clé GPG, aligne la version du pom sur le tag ;
+4. lance `./mvnw -Prelease deploy` → jar + sources + javadoc, signés, envoyés sur Central avec
+   auto-publication (le plugin `central-publishing` attend la fin du processing avant de rendre la
+   main).
+
+L'artefact est ensuite visible sous `fr.nedjar.vigiechiro:audio-view:vX.Y.Z` sur
+<https://central.sonatype.com> et propagé à Maven Central dans la foulée (latence ~10-30 min). Les
+steps conditionnels sont sautés silencieusement tant que les secrets manquent, donc rien ne casse en
+attendant.

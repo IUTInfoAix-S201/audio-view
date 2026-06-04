@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Settings Maven utilisés par la CI release (cf. .github/workflows/release.yml) pour
+  authentifier la publication vers Sonatype Central. Les variables d'environnement
+  CENTRAL_USERNAME / CENTRAL_PASSWORD sont fournies par les secrets GitHub Actions.
+  Le serverId "central" correspond à <publishingServerId> du central-publishing-maven-plugin
+  configuré dans le profil "release" du pom.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <servers>
+    <server>
+      <id>central</id>
+      <username>${env.CENTRAL_USERNAME}</username>
+      <password>${env.CENTRAL_PASSWORD}</password>
+    </server>
+  </servers>
+</settings>
