@@ -8,6 +8,30 @@ propriétés. En interne, le composant suit une architecture **MVVM** (vue `fx:r
 les contributeurs trouveront les détails dans [CONTRIBUTING.md](CONTRIBUTING.md) et
 [TESTING.md](TESTING.md).
 
+![Aperçu d'AudioView affichant une séquence de cris de chiroptères : sonogramme en haut, spectrogramme en bas](docs/apercu.png)
+
+*Une séquence de cris de chiroptères : **sonogramme** (amplitude) en haut, **spectrogramme**
+(fréquence, colormap « inferno ») en bas, barre de lecture et de zoom, axes gradués (temps en s,
+fréquence en kHz) et légende d'intensité (dB). Capture issue de l'application [audio-view-demo](https://github.com/IUTInfoAix-S201/audio-view-demo).*
+
+## Ce que permet le composant
+
+À partir d'un simple chemin de fichier WAV, et **sans écrire une ligne de traitement du signal**,
+`AudioView` offre, prêt à l'emploi :
+
+- **Sonogramme + spectrogramme synchronisés** (FFT interne) partageant un **curseur de lecture** ;
+  un clic sur l'un des tracés déplace le curseur.
+- **Lecture audio** du fichier (lecture / pause / **boucle**), curseur synchronisé au son, avec
+  **normalisation peak optionnelle du volume** à l'écoute (gain au rendu, sans modifier le fichier).
+- **Zooms temps et fréquence** interactifs et **cadrage automatique** à l'ouverture (sonogramme à
+  l'échelle du pic, vue fréquentielle sur la bande réellement utilisée).
+- **Axes gradués** avec **facteur d'expansion** pour afficher les unités réelles des enregistrements
+  ralentis (ex. ×10 pour ramener les ultrasons de chiroptères dans la bande audible).
+- **Thème clair / sombre**, **mode daltonien** (colormap Viridis assortie au thème) et
+  personnalisation **CSS**.
+- Une **API 100 % observable** : on lie ses propriétés (`currentTime`, `duration`, `playing`…) au
+  reste de l'IHM ; décodage, FFT et lecture restent une **boîte noire**.
+
 ## Distribution via JitPack
 
 Le composant est publié sur [JitPack](https://jitpack.io) à partir d'un tag Git. Aucune
@@ -93,12 +117,16 @@ Pensez à appeler `audioView.dispose()` à la fermeture pour libérer le périph
 | `audioFileProperty()` / `setAudioFile(Path)` | `ObjectProperty<Path>` | Source WAV ; déclenche le décodage et la FFT en tâche de fond. |
 | `setSource(String)` | — | Variante pratique acceptant un chemin sous forme de chaîne. |
 | `playingProperty()` / `setPlaying(boolean)` / `togglePlay()` | `BooleanProperty` | Lecture / pause. |
+| `loopProperty()` / `setLoop(boolean)` | `BooleanProperty` | Lecture en **boucle** (défaut : off → arrêt en fin d'extrait). |
+| `normalisationProperty()` / `setNormalisation(boolean)` | `BooleanProperty` | **Normalisation peak** du volume à la lecture (gain au rendu, sans modifier le fichier ; défaut : off). |
+| `normalisationGainDbProperty()` | `ReadOnlyDoubleProperty` | Gain de normalisation effectivement appliqué, en dB (0 si désactivé). |
 | `currentTimeProperty()` | `ReadOnlyDoubleProperty` | Position de lecture en secondes (curseur). |
 | `durationProperty()` | `ReadOnlyDoubleProperty` | Durée totale en secondes. |
 | `timeZoomProperty()` | `DoubleProperty` | Facteur de zoom temporel (1 = vue complète). |
 | `frequencyZoomProperty()` | `DoubleProperty` | Facteur de zoom fréquentiel (1 = pleine bande). |
 | `timeExpansionFactorProperty()` / `setTimeExpansionFactor(double)` | `DoubleProperty` | Met à l'échelle les libellés des axes (fréquence ×facteur, temps ÷facteur). Ex. `10` pour les WAV ralentis ×10 → axes en unités réelles. Défaut `1`. N'affecte pas `currentTime`/`duration`. |
 | `lightThemeProperty()` / `setLightTheme(boolean)` / `isLightTheme()` | `BooleanProperty` | Active le **thème clair** (défaut : sombre). Bascule la chrome **et** la colormap du spectrogramme. |
+| `colorblindFriendlyProperty()` / `setColorblindFriendly(boolean)` | `BooleanProperty` | Palette **daltonien-friendly** (Viridis), assortie au thème. |
 | `dispose()` | — | Libère le clip audio. |
 
 Le spectrogramme et le sonogramme sont gradués automatiquement : axe **temps** (s) en bas, axe
