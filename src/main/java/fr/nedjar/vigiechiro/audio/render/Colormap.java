@@ -31,6 +31,20 @@ public enum Colormap {
         {0.40, 0.45, 0.70, 0.90},
         {0.75, 0.15, 0.30, 0.70},
         {1.00, 0.25, 0.00, 0.35}
+    }),
+
+    /**
+     * Rampe perceptuellement uniforme (style « Viridis » de matplotlib), conçue pour rester lisible
+     * avec les principales formes de daltonisme (deutéranopie, protanopie, tritanopie) — issue #24.
+     * Violet sombre → bleu → vert → jaune clair, monotone en luminance perçue. À privilégier comme
+     * variante d'accessibilité.
+     */
+    VIRIDIS(new double[][] {
+        {0.00, 0.267, 0.005, 0.329},
+        {0.25, 0.282, 0.140, 0.458},
+        {0.50, 0.254, 0.265, 0.529},
+        {0.75, 0.207, 0.372, 0.553},
+        {1.00, 0.993, 0.906, 0.144}
     });
 
     // Chaque ligne : {position dans [0,1], R, G, B}. Stops triés par position croissante.

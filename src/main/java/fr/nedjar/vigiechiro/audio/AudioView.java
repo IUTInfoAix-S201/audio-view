@@ -125,6 +125,25 @@ public class AudioView extends BorderPane {
         }
     };
 
+    /// Force la palette daltonien-friendly (Viridis) quand `true`, défaut `false` (palettes
+    /// thématiques sombre/clair). Issue #24.
+    private final BooleanProperty colorblindFriendly = new BooleanPropertyBase(false) {
+        @Override
+        protected void invalidated() {
+            applyTheme(lightTheme.get());
+        }
+
+        @Override
+        public Object getBean() {
+            return AudioView.this;
+        }
+
+        @Override
+        public String getName() {
+            return "colorblindFriendly";
+        }
+    };
+
     private final AudioViewModel vm = new AudioViewModel();
     private final SonogramViewModel sonoVm = new SonogramViewModel(vm);
     private final SpectrogramViewModel spectroVm = new SpectrogramViewModel(vm);
@@ -161,6 +180,35 @@ public class AudioView extends BorderPane {
         } catch (IOException e) {
             throw new IllegalStateException("Chargement de AudioView.fxml impossible", e);
         }
+        // A11y (issue #24) : focusable + raccourcis clavier + rôle accessible.
+        setFocusTraversable(true);
+        setAccessibleRoleDescription("Visualiseur audio (sonogramme et spectrogramme)");
+        setOnKeyPressed(this::onKeyPressed);
+    }
+
+    /// Raccourcis clavier (issue #24). Le composant doit avoir le focus (Tab) pour les recevoir.
+    ///
+    /// - **Espace** : démarrer / mettre en pause la lecture
+    /// - **←** / **→** : reculer / avancer d'1 seconde fichier
+    /// - **Origine** / **Fin** : aller au début / à la fin de l'extrait
+    /// - **+** ou **=** / **-** : zoom temporel × 2 / ÷ 2
+    /// - **PgUp** / **PgDown** : zoom fréquentiel × 2 / ÷ 2
+    private void onKeyPressed(javafx.scene.input.KeyEvent e) {
+        switch (e.getCode()) {
+            case SPACE -> togglePlay();
+            case LEFT -> vm.seek(Math.max(0, vm.getCurrentTime() - 1));
+            case RIGHT -> vm.seek(Math.min(vm.getDuration(), vm.getCurrentTime() + 1));
+            case HOME -> vm.seek(0);
+            case END -> vm.seek(vm.getDuration());
+            case EQUALS, PLUS, ADD -> setTimeZoom(Math.min(64, getTimeZoom() * 2));
+            case MINUS, SUBTRACT -> setTimeZoom(Math.max(1, getTimeZoom() / 2));
+            case PAGE_UP -> setFrequencyZoom(Math.min(64, getFrequencyZoom() * 2));
+            case PAGE_DOWN -> setFrequencyZoom(Math.max(1, getFrequencyZoom() / 2));
+            default -> {
+                return;
+            }
+        }
+        e.consume();
     }
 
     /** Câblage shell + branchement des sous-vues, appelé par FXMLLoader après injection des @FXML. */
@@ -203,7 +251,12 @@ public class AudioView extends BorderPane {
         // Branchement des sous-vues à la session (chaque sous-vue installe ses propres listeners de
         // redraw, déclic-seek et repositionnement de curseur).
         sonoView.bindTo(sonoVm, waveColor);
-        spectroView.bindTo(spectroVm, this::isLightTheme);
+        spectroView.bindTo(spectroVm, this::currentColormap);
+
+        // A11y (issue #24) : libellés explicites pour lecteurs d'écran.
+        playButton.setAccessibleText("Lecture ou pause de l'audio");
+        sonoView.setAccessibleRoleDescription("Sonogramme (amplitude au cours du temps)");
+        spectroView.setAccessibleRoleDescription("Spectrogramme (fréquence au cours du temps)");
     }
 
     // ----- Commandes (handlers FXML) -----
@@ -440,6 +493,27 @@ public class AudioView extends BorderPane {
         lightTheme.set(value);
     }
 
+    /// Variante de palette **daltonien-friendly** (issue #24) : quand `true`, le spectrogramme
+    /// utilise la rampe Viridis (perceptuellement uniforme, lisible avec les trois principales
+    /// formes de daltonisme) en lieu et place des palettes sombre/clair par défaut. La bascule
+    /// de [#lightThemeProperty()] continue d'affecter la chrome (toolbar, axes, fond) mais pas
+    /// la rampe du spectrogramme tant que cette propriété est `true`.
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `false`
+    public final BooleanProperty colorblindFriendlyProperty() {
+        return colorblindFriendly;
+    }
+
+    /// `true` si la palette daltonien-friendly est active.
+    public final boolean isColorblindFriendly() {
+        return colorblindFriendly.get();
+    }
+
+    /// Active (`true`) ou désactive (`false`, défaut) la palette daltonien-friendly.
+    public final void setColorblindFriendly(boolean value) {
+        colorblindFriendly.set(value);
+    }
+
     /// Message d'erreur de chargement (français, prêt pour affichage).
     ///
     /// `null` tant qu'aucune erreur n'a été rencontrée. Renseigné quand la tâche de décodage /
@@ -482,10 +556,19 @@ public class AudioView extends BorderPane {
 
     private void applyTheme(boolean light) {
         pseudoClassStateChanged(LIGHT_THEME, light);
-        vm.setColormap(light ? Colormap.CLAIR : Colormap.SOMBRE);
+        vm.setColormap(currentColormap());
         if (spectroView != null) {
             spectroView.refreshColorbar();
         }
+    }
+
+    /// Colormap effective compte tenu des deux flags : `colorblindFriendly` prend la priorité (force
+    /// Viridis) sinon Sombre / Clair selon `lightTheme`. Visible aux sous-vues via {@code bindTo}.
+    private Colormap currentColormap() {
+        if (colorblindFriendly.get()) {
+            return Colormap.VIRIDIS;
+        }
+        return lightTheme.get() ? Colormap.CLAIR : Colormap.SOMBRE;
     }
 
     /// Libère le périphérique audio et arrête l'horloge interne.

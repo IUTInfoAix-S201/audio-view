@@ -6,7 +6,7 @@ import fr.nedjar.vigiechiro.audio.render.Colormap;
 import fr.nedjar.vigiechiro.audio.viewmodel.AudioViewModel;
 import fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModel;
 import java.io.IOException;
-import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import javafx.beans.value.ChangeListener;
 import javafx.fxml.FXML;
 import javafx.fxml.FXMLLoader;
@@ -27,8 +27,8 @@ import javafx.scene.shape.Rectangle;
 /**
  * Sous-vue du tracé spectrogramme (custom control fx:root {@code extends StackPane}). Issue #9.
  *
- * <p>Charge {@code SpectrogramView.fxml}, expose {@link #bindTo(SpectrogramViewModel,
- * BooleanSupplier)} pour le câblage par le parent. Encapsule le recadrage de l'image (viewport),
+ * <p>Charge {@code SpectrogramView.fxml}, expose {@link #bindTo(SpectrogramViewModel, Supplier)}
+ * pour le câblage par le parent. Encapsule le recadrage de l'image (viewport),
  * les axes (fréquence à gauche, temps en bas) et la légende dB rattachée à la zone (issue #9). Le
  * seek-au-clic est géré ici. Le repositionnement de la bande de la légende selon le thème
  * (sombre/clair) est piloté par le parent via {@link #refreshColorbar()}.
@@ -62,7 +62,7 @@ public final class SpectrogramView extends StackPane {
     private Rectangle colorbarBande;
 
     private SpectrogramViewModel vm;
-    private BooleanSupplier lightTheme;
+    private Supplier<Colormap> currentColormap;
 
     public SpectrogramView() {
         FXMLLoader loader = new FXMLLoader(getClass().getResource("SpectrogramView.fxml"));
@@ -92,9 +92,9 @@ public final class SpectrogramView extends StackPane {
     /**
      * Câble la sous-vue à son ViewModel + à un accesseur du thème courant (utilisé pour la légende).
      */
-    public void bindTo(SpectrogramViewModel vm, BooleanSupplier lightTheme) {
+    public void bindTo(SpectrogramViewModel vm, Supplier<Colormap> currentColormap) {
         this.vm = vm;
-        this.lightTheme = lightTheme;
+        this.currentColormap = currentColormap;
 
         buildColorbarLegend();
 
@@ -114,7 +114,7 @@ public final class SpectrogramView extends StackPane {
     /** Réinitialise la bande de la légende après un changement de thème (parent → enfant). */
     public void refreshColorbar() {
         if (colorbarBande != null) {
-            colorbarBande.setFill(buildColorbarGradient(colormapFor(lightTheme.getAsBoolean())));
+            colorbarBande.setFill(buildColorbarGradient(currentColormap.get()));
         }
     }
 
@@ -253,7 +253,7 @@ public final class SpectrogramView extends StackPane {
         legend.getChildren().add(entete);
 
         Rectangle bande = new Rectangle(stripX, stripTop, stripW, barH);
-        bande.setFill(buildColorbarGradient(colormapFor(lightTheme.getAsBoolean())));
+        bande.setFill(buildColorbarGradient(currentColormap.get()));
         bande.setStroke(AXIS_TEXT);
         bande.setStrokeWidth(1);
         legend.getChildren().add(bande);
@@ -283,11 +283,6 @@ public final class SpectrogramView extends StackPane {
             stops[i] = new Stop(offset, colormap.at(1 - offset));
         }
         return new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE, stops);
-    }
-
-    /** Conversion thème (booléen) → {@link Colormap} : pont entre l'API publique et l'enum. */
-    private static Colormap colormapFor(boolean light) {
-        return light ? Colormap.CLAIR : Colormap.SOMBRE;
     }
 
     // ----- Accesseurs pour les bindings responsive du parent -----

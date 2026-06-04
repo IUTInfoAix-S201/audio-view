@@ -13,6 +13,12 @@
   -fx-wave-color: #7fd4ff;
 }
 
+/* A11y (issue #24) : focus visible quand l'utilisateur navigue au clavier (Tab).
+   Halo dodgerblue suffisamment contrasté contre les deux thèmes. */
+.audio-view:focused {
+  -fx-effect: dropshadow(gaussian, dodgerblue, 8, 0.4, 0, 0);
+}
+
 /* Barre d'outils */
 .audio-view-toolbar {
   -fx-background-color: #11161d;
