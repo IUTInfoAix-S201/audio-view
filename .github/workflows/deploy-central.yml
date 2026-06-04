@@ -1,22 +1,22 @@
 # Déploiement manuel vers Maven Central (issue #25).
 #
-# Le workflow release.yml déploie automatiquement quand semantic-release crée un nouveau tag
-# (feat:/fix:/BREAKING). Ce workflow-ci sert aux cas où l'on veut publier MANUELLEMENT une
-# version existante : premier déploiement (le tag courant a été créé par un chore: et n'a pas
-# déclenché le déploiement auto), republication après échec, ou diffusion tardive d'une release
-# antérieure.
+# Publie la DERNIÈRE release (dernier tag git) du composant vers Maven Central. Le workflow
+# release.yml déploie automatiquement quand semantic-release crée un nouveau tag ; ce workflow-ci
+# sert aux cas où l'on veut publier MANUELLEMENT : premier déploiement après l'activation des
+# secrets, republication après échec de release.yml.
 #
-# Déclenchement : onglet « Actions » du repo GitHub → « deploy-central » → « Run workflow »,
-# entrer le tag (ex: v1.10.0) puis Run. Nécessite les mêmes secrets que release.yml :
+# Le job checkout `main` (pas le tag) car la plomberie de release (profil "release", settings
+# Maven, métadonnées Central dans le pom) n'est présente qu'à partir du commit qui l'a introduite.
+# La version du pom est alignée sur le dernier tag (`versions:set`) avant `deploy`. Conséquence :
+# on ne PEUT PAS republier rétroactivement des versions antérieures à cette plomberie ; Central
+# démarrera à la première release publiée par ce workflow.
+#
+# Déclenchement : onglet "Actions" → "deploy-central" → "Run workflow". Nécessite les 4 secrets :
 # CENTRAL_USERNAME, CENTRAL_PASSWORD, GPG_PRIVATE_KEY, GPG_PASSPHRASE.
 name: deploy-central
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Tag à publier (ex: v1.10.0)"
-        required: true
 
 permissions:
   contents: read
@@ -25,10 +25,18 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout du tag
+      - name: Checkout main
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.inputs.version }}
+          fetch-depth: 0 # pour récupérer tous les tags
+
+      - name: Récupérer la dernière version
+        id: tag
+        run: |
+          git fetch --tags --force
+          LAST_TAG=$(git describe --tags --abbrev=0)
+          echo "value=${LAST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Version à publier : ${LAST_TAG}"
 
       - name: Configurer JDK 25 (Temurin)
         uses: actions/setup-java@v5
@@ -48,7 +56,7 @@ jobs:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.tag.outputs.value }}
         run: |
           VERSION_NUM="${VERSION#v}"
           ./mvnw -B --no-transfer-progress versions:set -DnewVersion="$VERSION_NUM" -DgenerateBackupPoms=false
