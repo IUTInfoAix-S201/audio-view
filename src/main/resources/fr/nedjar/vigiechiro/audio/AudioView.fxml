@@ -6,8 +6,8 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
-<?import fr.nedjar.vigiechiro.audio.SonogramView?>
-<?import fr.nedjar.vigiechiro.audio.SpectrogramView?>
+<?import fr.nedjar.vigiechiro.audio.view.SonogramView?>
+<?import fr.nedjar.vigiechiro.audio.view.SpectrogramView?>
 
 <!--
   Vue racine du composant AudioView (pattern fx:root). Depuis l'issue #9, le contenu central est

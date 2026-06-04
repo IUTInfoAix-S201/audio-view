@@ -287,16 +287,16 @@
                 <rule>
                   <element>CLASS</element>
                   <includes>
-                    <include>fr.nedjar.vigiechiro.audio.Fft</include>
-                    <include>fr.nedjar.vigiechiro.audio.Spectrogram</include>
-                    <include>fr.nedjar.vigiechiro.audio.AudioSample</include>
-                    <include>fr.nedjar.vigiechiro.audio.Colormap</include>
-                    <include>fr.nedjar.vigiechiro.audio.AxisTicks</include>
-                    <include>fr.nedjar.vigiechiro.audio.AudioAnalyzer</include>
-                    <include>fr.nedjar.vigiechiro.audio.PlaybackModel</include>
-                    <include>fr.nedjar.vigiechiro.audio.SpectrogramImageFactory</include>
-                    <include>fr.nedjar.vigiechiro.audio.SonogramViewModel</include>
-                    <include>fr.nedjar.vigiechiro.audio.SpectrogramViewModel</include>
+                    <include>fr.nedjar.vigiechiro.audio.dsp.Fft</include>
+                    <include>fr.nedjar.vigiechiro.audio.dsp.Spectrogram</include>
+                    <include>fr.nedjar.vigiechiro.audio.dsp.AudioSample</include>
+                    <include>fr.nedjar.vigiechiro.audio.render.Colormap</include>
+                    <include>fr.nedjar.vigiechiro.audio.render.AxisTicks</include>
+                    <include>fr.nedjar.vigiechiro.audio.dsp.AudioAnalyzer</include>
+                    <include>fr.nedjar.vigiechiro.audio.playback.PlaybackModel</include>
+                    <include>fr.nedjar.vigiechiro.audio.render.SpectrogramImageFactory</include>
+                    <include>fr.nedjar.vigiechiro.audio.viewmodel.SonogramViewModel</include>
+                    <include>fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModel</include>
                   </includes>
                   <limits>
                     <limit>
@@ -328,27 +328,27 @@
         </dependencies>
         <configuration>
           <targetClasses>
-            <param>fr.nedjar.vigiechiro.audio.Fft</param>
-            <param>fr.nedjar.vigiechiro.audio.Spectrogram</param>
-            <param>fr.nedjar.vigiechiro.audio.AudioSample</param>
-            <param>fr.nedjar.vigiechiro.audio.Colormap</param>
-            <param>fr.nedjar.vigiechiro.audio.AxisTicks</param>
-            <param>fr.nedjar.vigiechiro.audio.AudioAnalyzer</param>
-            <param>fr.nedjar.vigiechiro.audio.PlaybackModel</param>
-            <param>fr.nedjar.vigiechiro.audio.SpectrogramImageFactory</param>
-            <param>fr.nedjar.vigiechiro.audio.SonogramViewModel</param>
-            <param>fr.nedjar.vigiechiro.audio.SpectrogramViewModel</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.Fft</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.Spectrogram</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.AudioSample</param>
+            <param>fr.nedjar.vigiechiro.audio.render.Colormap</param>
+            <param>fr.nedjar.vigiechiro.audio.render.AxisTicks</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.AudioAnalyzer</param>
+            <param>fr.nedjar.vigiechiro.audio.playback.PlaybackModel</param>
+            <param>fr.nedjar.vigiechiro.audio.render.SpectrogramImageFactory</param>
+            <param>fr.nedjar.vigiechiro.audio.viewmodel.SonogramViewModel</param>
+            <param>fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModel</param>
           </targetClasses>
           <targetTests>
-            <param>fr.nedjar.vigiechiro.audio.FftTest</param>
-            <param>fr.nedjar.vigiechiro.audio.SpectrogramTest</param>
-            <param>fr.nedjar.vigiechiro.audio.AudioSampleTest</param>
-            <param>fr.nedjar.vigiechiro.audio.ColormapTest</param>
-            <param>fr.nedjar.vigiechiro.audio.AxisTicksTest</param>
-            <param>fr.nedjar.vigiechiro.audio.AudioAnalyzerTest</param>
-            <param>fr.nedjar.vigiechiro.audio.PlaybackModelTest</param>
-            <param>fr.nedjar.vigiechiro.audio.SonogramViewModelTest</param>
-            <param>fr.nedjar.vigiechiro.audio.SpectrogramViewModelTest</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.FftTest</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.SpectrogramTest</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.AudioSampleTest</param>
+            <param>fr.nedjar.vigiechiro.audio.render.ColormapTest</param>
+            <param>fr.nedjar.vigiechiro.audio.render.AxisTicksTest</param>
+            <param>fr.nedjar.vigiechiro.audio.dsp.AudioAnalyzerTest</param>
+            <param>fr.nedjar.vigiechiro.audio.playback.PlaybackModelTest</param>
+            <param>fr.nedjar.vigiechiro.audio.viewmodel.SonogramViewModelTest</param>
+            <param>fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModelTest</param>
           </targetTests>
         </configuration>
       </plugin>

@@ -1,5 +1,11 @@
 package fr.nedjar.vigiechiro.audio;
 
+import fr.nedjar.vigiechiro.audio.render.Colormap;
+import fr.nedjar.vigiechiro.audio.view.SonogramView;
+import fr.nedjar.vigiechiro.audio.view.SpectrogramView;
+import fr.nedjar.vigiechiro.audio.viewmodel.AudioViewModel;
+import fr.nedjar.vigiechiro.audio.viewmodel.SonogramViewModel;
+import fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModel;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;

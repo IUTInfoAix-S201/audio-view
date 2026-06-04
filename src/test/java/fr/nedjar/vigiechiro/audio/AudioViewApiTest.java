@@ -2,6 +2,8 @@ package fr.nedjar.vigiechiro.audio;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import fr.nedjar.vigiechiro.audio.view.SonogramView;
+import fr.nedjar.vigiechiro.audio.view.SpectrogramView;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;

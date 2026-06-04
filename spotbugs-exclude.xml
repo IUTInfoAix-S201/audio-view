@@ -2,17 +2,64 @@
 <FindBugsFilter>
   <!-- Les accesseurs xxxProperty() retournent volontairement la Property observable :
        c'est l'idiome JavaFX (le consommateur s'y abonne / la lie). EI_EXPOSE_REP n'est
-       donc pas pertinent ici, ce n'est pas une fuite de représentation. -->
+       donc pas pertinent ici, ce n'est pas une fuite de représentation. Étendu à tous
+       les packages depuis l'éclatement #19 (les classes internes sont public mais non
+       exportées par le module). -->
   <Match>
-    <Class name="fr.nedjar.vigiechiro.audio.AudioView"/>
-    <Method name="~.*Property"/>
+    <Class name="~fr\.nedjar\.vigiechiro\.audio(\..+)?\..+"/>
+    <Method name="~.*(Property|Binding)"/>
+    <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- legendPane() et plotHost() exposent intentionnellement leurs Pane internes à AudioView
+       parent, qui s'en sert pour les bindings responsive (visibility selon la taille). C'est
+       le contrat entre shell et sous-vue post-#9. -->
+  <Match>
+    <Class name="fr.nedjar.vigiechiro.audio.view.SpectrogramView"/>
+    <Or>
+      <Method name="legendPane"/>
+      <Method name="plotHost"/>
+    </Or>
     <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
+  <!-- Les sous-VM sont des façades sur la session AudioViewModel : capturer la référence est
+       leur raison d'être (issue #9). Ce n'est pas une fuite. -->
+  <Match>
+    <Or>
+      <Class name="fr.nedjar.vigiechiro.audio.viewmodel.SonogramViewModel"/>
+      <Class name="fr.nedjar.vigiechiro.audio.viewmodel.SpectrogramViewModel"/>
+    </Or>
+    <Method name="&lt;init&gt;"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- AudioSample.samples() expose intentionnellement le float[] décodé : la vue le parcourt
+       en lecture seule pour tracer l'enveloppe ; copier à chaque appel doublerait la mémoire
+       sans gain (l'invariant « lecture seule » est documenté dans la Javadoc). -->
+  <Match>
+    <Class name="fr.nedjar.vigiechiro.audio.dsp.AudioSample"/>
+    <Method name="samples"/>
+    <Bug pattern="EI_EXPOSE_REP"/>
+  </Match>
+  <!-- Stockage par référence intentionnel : AudioSample(float[]) et Colormap(double[][]) sont
+       des constructeurs internes consommés en interne ; cloner les arrays à la construction
+       multiplierait la mémoire (samples audio : centaines de milliers de floats). -->
+  <Match>
+    <Or>
+      <Class name="fr.nedjar.vigiechiro.audio.dsp.AudioSample"/>
+      <Class name="fr.nedjar.vigiechiro.audio.render.Colormap"/>
+    </Or>
+    <Method name="&lt;init&gt;"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
   <!-- Le pattern fx:root impose de charger le FXML dans le constructeur (FXMLLoader.load() peut
        lever IOException, relayée en IllegalStateException). Le throw n'est atteint que si le FXML
-       embarqué manque/est corrompu (erreur de build), pas un vecteur d'attaque par finaliseur. -->
+       embarqué manque/est corrompu (erreur de build), pas un vecteur d'attaque par finaliseur.
+       Étendu aux deux sous-vues (même pattern fx:root). -->
   <Match>
-    <Class name="fr.nedjar.vigiechiro.audio.AudioView"/>
+    <Or>
+      <Class name="fr.nedjar.vigiechiro.audio.AudioView"/>
+      <Class name="fr.nedjar.vigiechiro.audio.view.SonogramView"/>
+      <Class name="fr.nedjar.vigiechiro.audio.view.SpectrogramView"/>
+    </Or>
     <Method name="&lt;init&gt;"/>
     <Bug pattern="CT_CONSTRUCTOR_THROW"/>
   </Match>
