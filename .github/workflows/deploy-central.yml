@@ -1,0 +1,57 @@
+# Déploiement manuel vers Maven Central (issue #25).
+#
+# Le workflow release.yml déploie automatiquement quand semantic-release crée un nouveau tag
+# (feat:/fix:/BREAKING). Ce workflow-ci sert aux cas où l'on veut publier MANUELLEMENT une
+# version existante : premier déploiement (le tag courant a été créé par un chore: et n'a pas
+# déclenché le déploiement auto), republication après échec, ou diffusion tardive d'une release
+# antérieure.
+#
+# Déclenchement : onglet « Actions » du repo GitHub → « deploy-central » → « Run workflow »,
+# entrer le tag (ex: v1.10.0) puis Run. Nécessite les mêmes secrets que release.yml :
+# CENTRAL_USERNAME, CENTRAL_PASSWORD, GPG_PRIVATE_KEY, GPG_PASSPHRASE.
+name: deploy-central
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Tag à publier (ex: v1.10.0)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.inputs.version }}
+
+      - name: Configurer JDK 25 (Temurin)
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: "temurin"
+
+      - name: Importer la clé GPG
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --list-secret-keys --keyid-format LONG
+
+      - name: Publier sur Maven Central
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          VERSION_NUM="${VERSION#v}"
+          ./mvnw -B --no-transfer-progress versions:set -DnewVersion="$VERSION_NUM" -DgenerateBackupPoms=false
+          ./mvnw -B --no-transfer-progress -Prelease -DskipTests \
+            --settings .github/maven-settings.xml \
+            deploy

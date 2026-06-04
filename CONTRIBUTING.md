@@ -168,6 +168,12 @@ sur `main`, le workflow `release.yml` :
    auto-publication (le plugin `central-publishing` attend la fin du processing avant de rendre la
    main).
 
+### Déploiement manuel d'une version existante
+
+Pour publier une release **déjà taguée** (premier déploiement après l'activation des secrets,
+republication après échec, ou diffusion tardive d'une release antérieure) : onglet **Actions** du
+repo → **deploy-central** → **Run workflow**, entrer le tag (ex: `v1.10.0`) et lancer.
+
 L'artefact est ensuite visible sous `fr.nedjar.vigiechiro:audio-view:vX.Y.Z` sur
 <https://central.sonatype.com> et propagé à Maven Central dans la foulée (latence ~10-30 min). Les
 steps conditionnels sont sautés silencieusement tant que les secrets manquent, donc rien ne casse en
