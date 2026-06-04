@@ -66,6 +66,17 @@ class ColormapTest {
         assertThat(y0).isGreaterThan(y04).isGreaterThan(y08).isGreaterThan(y1);
     }
 
+    @Test
+    void luminanceMonotoneCroissantePourViridis() {
+        // Viridis est perceptuellement uniforme : luminance strictement croissante avec t — c'est
+        // précisément ce qui la rend lisible avec les principales formes de daltonisme (#24).
+        double y0 = luminance(Colormap.VIRIDIS.at(0));
+        double y04 = luminance(Colormap.VIRIDIS.at(0.4));
+        double y08 = luminance(Colormap.VIRIDIS.at(0.8));
+        double y1 = luminance(Colormap.VIRIDIS.at(1));
+        assertThat(y0).isLessThan(y04).isLessThan(y08).isLessThan(y1);
+    }
+
     // Luminance perçue ITU-R BT.709, sans toolkit (Color est un simple value object).
     private static double luminance(Color c) {
         return 0.2126 * c.getRed() + 0.7152 * c.getGreen() + 0.0722 * c.getBlue();
