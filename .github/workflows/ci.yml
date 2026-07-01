@@ -10,33 +10,24 @@ permissions:
 
 jobs:
   build:
-    name: ${{ matrix.name }}
+    name: Temurin 25 (JDK vanilla)
     runs-on: ubuntu-latest
-    strategy:
-      # On veut le resultat des deux JDK meme si l'un echoue.
-      fail-fast: false
-      matrix:
-        include:
-          # JDK vanilla (sans JavaFX embarque) : prouve que la config Maven est
-          # portable (les modules OpenJFX viennent des artefacts classifies, pas
-          # du JDK). C'est aussi la condition du build JitPack.
-          - name: Temurin 25 (JDK vanilla)
-            distribution: temurin
-            java-package: jdk
-          # JDK Zulu avec JavaFX embarque (jdk+fx) : filet de securite, aligne sur
-          # le poste de dev (fx-zulu) et la CI des TP R2.02.
-          - name: Zulu 25 (JDK + JavaFX)
-            distribution: zulu
-            java-package: jdk+fx
     steps:
       - uses: actions/checkout@v6
 
-      - name: Configurer JDK 25 (${{ matrix.distribution }} / ${{ matrix.java-package }})
+      # JDK vanilla (sans JavaFX embarque) : les modules OpenJFX viennent des artefacts
+      # Maven classifies, pas du JDK, ce qui prouve la portabilite et reflete le build JitPack.
+      #
+      # Plus de job Zulu jdk+fx : son JavaFX 25 embarque masque les jars FX 26 du module-path,
+      # or la Headless Platform (glass.platform=Headless) n'existe qu'en FX 26. Les tests TestFX
+      # y echouaient donc en NPE (com.sun.glass.ui.PlatformFactory.getPlatformFactory() null).
+      # Meme raison que le retrait du jdk+fx en CI cote TP R2.02.
+      - name: Configurer JDK 25 (Temurin, vanilla)
         uses: actions/setup-java@v5
         with:
           java-version: '25'
-          distribution: ${{ matrix.distribution }}
-          java-package: ${{ matrix.java-package }}
+          distribution: temurin
+          java-package: jdk
           cache: maven
 
       # Quality gate complet : enforcer + Spotless(off) + PMD strict (-Pquality-gate) +
