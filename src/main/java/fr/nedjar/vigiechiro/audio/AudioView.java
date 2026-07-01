@@ -30,7 +30,6 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -58,27 +57,7 @@ import javafx.scene.paint.Color;
  * view.setPlaying(true);
  * }</pre>
  */
-// AudioView est la FAÇADE d'API publique du composant : une longue liste d'accesseurs fins qui
-// délèguent au ViewModel (property/is/set par réglage). Son NCSS croît mécaniquement à chaque
-// nouvelle propriété exposée (ici waveNormalisation), sans complexité réelle : la métrique NcssCount
-// n'y est pas un signal utile, comme pour AudioViewModel (déjà suppressé). Suppression assumée.
-@SuppressWarnings("PMD.NcssCount")
 public class AudioView extends BorderPane {
-
-    /** Largeur de la gouttière gauche, utilisée pour le binding responsive de la légende. */
-    private static final double AXIS_LEFT = 48;
-
-    /**
-     * Seuils de masquage responsive (issue #30) : sous ces tailles, la légende dB et/ou le sonogramme
-     * sont masqués pour laisser toute la place au spectrogramme — plutôt que de tout tasser jusqu'à
-     * devenir illisible. La barre d'outils, elle, reste toujours visible (la hauteur min du composant
-     * est calculée par {@link BorderPane} depuis son {@code top}).
-     */
-    private static final double LEGEND_MIN_PLOT_WIDTH = 320;
-
-    private static final double LEGEND_MIN_SPECTRO_HEIGHT = 200;
-
-    private static final double SONO_MIN_PLOTS_HEIGHT = 120;
 
     private static final Color WAVE_COLOR_DEFAULT = Color.web("#7fd4ff");
 
@@ -194,35 +173,11 @@ public class AudioView extends BorderPane {
         } catch (IOException e) {
             throw new IllegalStateException("Chargement de AudioView.fxml impossible", e);
         }
-        // A11y (issue #24) : focusable + raccourcis clavier + rôle accessible.
+        // A11y (issue #24) : focusable + raccourcis clavier + rôle accessible. Le mapping des touches
+        // vit dans AudioViewShortcuts (hors de la façade).
         setFocusTraversable(true);
         setAccessibleRoleDescription("Visualiseur audio (sonogramme et spectrogramme)");
-        setOnKeyPressed(this::onKeyPressed);
-    }
-
-    /// Raccourcis clavier (issue #24). Le composant doit avoir le focus (Tab) pour les recevoir.
-    ///
-    /// - **Espace** : démarrer / mettre en pause la lecture
-    /// - **←** / **→** : reculer / avancer d'1 seconde fichier
-    /// - **Origine** / **Fin** : aller au début / à la fin de l'extrait
-    /// - **+** ou **=** / **-** : zoom temporel × 2 / ÷ 2
-    /// - **PgUp** / **PgDown** : zoom fréquentiel × 2 / ÷ 2
-    private void onKeyPressed(javafx.scene.input.KeyEvent e) {
-        switch (e.getCode()) {
-            case SPACE -> togglePlay();
-            case LEFT -> vm.seek(Math.max(0, vm.getCurrentTime() - 1));
-            case RIGHT -> vm.seek(Math.min(vm.getDuration(), vm.getCurrentTime() + 1));
-            case HOME -> vm.seek(0);
-            case END -> vm.seek(vm.getDuration());
-            case EQUALS, PLUS, ADD -> setTimeZoom(Math.min(64, getTimeZoom() * 2));
-            case MINUS, SUBTRACT -> setTimeZoom(Math.max(1, getTimeZoom() / 2));
-            case PAGE_UP -> setFrequencyZoom(Math.min(64, getFrequencyZoom() * 2));
-            case PAGE_DOWN -> setFrequencyZoom(Math.max(1, getFrequencyZoom() / 2));
-            default -> {
-                return;
-            }
-        }
-        e.consume();
+        setOnKeyPressed(e -> AudioViewShortcuts.handle(e, this, vm));
     }
 
     /** Câblage shell + branchement des sous-vues, appelé par FXMLLoader après injection des @FXML. */
@@ -240,27 +195,9 @@ public class AudioView extends BorderPane {
         errorOverlay.visibleProperty().bind(vm.errorMessageProperty().isNotNull());
         errorOverlay.managedProperty().bind(errorOverlay.visibleProperty());
 
-        // Répartition verticale sonogramme / spectrogramme (32 % / 68 %). spectroView a
-        // VBox.vgrow=ALWAYS dans la FXML : quand sonoView est masqué (responsive, cf. issue #30) il
-        // prend toute la place disponible.
-        sonoView.prefHeightProperty().bind(plots.heightProperty().multiply(0.32));
-        spectroView.prefHeightProperty().bind(plots.heightProperty().multiply(0.68));
-
-        // Adaptation responsive (issue #30) : à l'étroit, la légende et/ou le sono sont masqués plutôt
-        // que tassés. La légende est dans spectroView (issue #9) ; ses critères se calculent sur la
-        // zone du tracé spectro (plotHost).
-        Pane legend = spectroView.legendPane();
-        Pane spectroPlotHost = spectroView.plotHost();
-        legend.visibleProperty()
-                .bind(spectroPlotHost
-                        .widthProperty()
-                        .subtract(AXIS_LEFT)
-                        .greaterThanOrEqualTo(LEGEND_MIN_PLOT_WIDTH)
-                        .and(spectroPlotHost.heightProperty().greaterThanOrEqualTo(LEGEND_MIN_SPECTRO_HEIGHT)));
-        legend.managedProperty().bind(legend.visibleProperty());
-
-        sonoView.visibleProperty().bind(plots.heightProperty().greaterThanOrEqualTo(SONO_MIN_PLOTS_HEIGHT));
-        sonoView.managedProperty().bind(sonoView.visibleProperty());
+        // Répartition verticale des tracés + masquage responsive (issue #30), extraits dans
+        // AudioViewLayout pour garder la façade légère.
+        AudioViewLayout.installResponsive(plots, sonoView, spectroView);
 
         // Branchement des sous-vues à la session (chaque sous-vue installe ses propres listeners de
         // redraw, déclic-seek et repositionnement de curseur).
