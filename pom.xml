@@ -48,10 +48,16 @@
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-    <javafx.version>25</javafx.version>
+    <javafx.version>26</javafx.version>
     <!-- Classifier JavaFX par plateforme, utilise UNIQUEMENT pour exécuter les tests.
          Surchargé par les profils plus bas (mac, mac-aarch64, windows). -->
     <javafx.platform>linux</javafx.platform>
+
+    <!-- Late-binding de l'agent JaCoCo : prepare-agent pose l'argLine ici (propertyName), et
+         surefire la réinjecte via @{jacocoArgLine}. Sans ce relais, l'argLine statique de surefire
+         (options JavaFX Headless) écraserait celle de JaCoCo et viderait la couverture. Défaut vide
+         pour que "mvn test" hors agent ne laisse pas un @{...} littéral. -->
+    <jacocoArgLine></jacocoArgLine>
 
     <junit.version>5.11.3</junit.version>
     <assertj.version>3.27.7</assertj.version>
@@ -161,6 +167,24 @@
         <version>3.5.6</version>
         <configuration>
           <useModulePath>false</useModulePath>
+          <!-- Headless Platform JavaFX 26 (Gluon) : plateforme Glass logicielle, en mémoire, SANS
+               serveur X (plus de xvfb). Le pipeline de rendu logiciel (sw) remplace le GPU. On NE
+               met PAS testfx.headless=true (il déclencherait le vieux bootstrap Monocle, absent) :
+               le headless vient de glass.platform=Headless. Aligné sur les TP R2.02 / vigiechiro. -->
+          <systemPropertyVariables>
+            <glass.platform>Headless</glass.platform>
+            <prism.order>sw</prism.order>
+            <java.awt.headless>true</java.awt.headless>
+            <testfx.robot>glass</testfx.robot>
+          </systemPropertyVariables>
+          <!-- Tests en mode classpath (useModulePath=false) : JavaFX vit dans le module non nommé,
+               donc des options « add-opens / add-exports » ciblant javafx.graphics seraient des no-op
+               « Unknown module ». On ne garde que @{jacocoArgLine} (agent de couverture, cf.
+               jacocoArgLine) et l'accès natif du module non nommé (libs natives JavaFX). -->
+          <argLine>
+            @{jacocoArgLine}
+            --enable-native-access=ALL-UNNAMED
+          </argLine>
         </configuration>
       </plugin>
 
@@ -306,6 +330,11 @@
             <goals>
               <goal>prepare-agent</goal>
             </goals>
+            <configuration>
+              <!-- Pose l'argLine de l'agent dans jacocoArgLine (et non l'argLine surefire par
+                   défaut), pour que surefire la compose avec les options JavaFX via @{jacocoArgLine}. -->
+              <propertyName>jacocoArgLine</propertyName>
+            </configuration>
           </execution>
           <execution>
             <id>jacoco-report</id>
