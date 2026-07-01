@@ -78,6 +78,26 @@ class AudioAnalyzerTest {
     }
 
     @Test
+    void sonoScaleNormaliseReleveLePlafondPourRemplirJusquAuPic() throws Exception {
+        // Même fichier très faible (pic 1/32768) : le plafond par défaut bride à 100, mais la
+        // normalisation visuelle remonte jusqu'à SONO_NORMALISED_MAX_GAIN (remplissage jusqu'au pic).
+        // Tue les mutants qui ignoreraient le paramètre maxGain ou réutiliseraient le plafond par défaut.
+        AudioSample s = AudioSample.load(ecrireWavMono(8000f, 0.2, (short) 1));
+        assertThat(AudioAnalyzer.sonoScaleFor(s)).isEqualTo(AudioAnalyzer.SONO_MAX_GAIN);
+        assertThat(AudioAnalyzer.sonoScaleFor(s, AudioAnalyzer.SONO_NORMALISED_MAX_GAIN))
+                .isEqualTo(AudioAnalyzer.SONO_NORMALISED_MAX_GAIN)
+                .isGreaterThan(AudioAnalyzer.sonoScaleFor(s));
+    }
+
+    @Test
+    void analyseFournitLesDeuxEchellesNormaliseeSuperieureOuEgale() throws Exception {
+        // analyze() pré-calcule les deux auto-échelles ; la normalisée n'est jamais inférieure à la
+        // plafonnée (même formule, plafond plus haut) — la vue bascule de l'une à l'autre sans re-décoder.
+        AudioAnalyzer.AnalyzedAudio result = AudioAnalyzer.analyze(ecrireWavMono(8000f, 0.2, (short) 1));
+        assertThat(result.normalisedSonoScale()).isGreaterThanOrEqualTo(result.sonoScale());
+    }
+
+    @Test
     void sonoScaleSurFichierSatureVautMoinsD1() throws Exception {
         // Pic max = 32767/32768 ≈ 1 → facteur ≈ 0.95 / 1 = 0.95.
         // Tue les mutants qui inverseraient le ratio peak/0.95.
