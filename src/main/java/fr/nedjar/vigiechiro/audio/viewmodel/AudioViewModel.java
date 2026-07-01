@@ -21,6 +21,7 @@ import javafx.beans.property.ReadOnlyObjectProperty;
 import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.ReadOnlyStringProperty;
 import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.concurrent.Task;
@@ -63,6 +64,15 @@ public final class AudioViewModel {
     private final ReadOnlyDoubleWrapper sonoScale = new ReadOnlyDoubleWrapper(this, "sonoScale", 1);
     private final ReadOnlyStringWrapper timeText = new ReadOnlyStringWrapper(this, "timeText", "0.00 / 0.00 s");
 
+    // Normalisation VISUELLE du sonogramme (distincte de la normalisation de LECTURE portée par
+    // PlaybackModel) : quand active, la forme d'onde est mise à l'échelle jusqu'à son pic réel (plafond
+    // de gain relevé), pour qu'un enregistrement faible remplisse la gouttière au lieu de rester plat.
+    // Les deux auto-échelles candidates sont pré-calculées à l'analyse ; la bascule ne fait que choisir
+    // laquelle publier dans sonoScale (aucun re-décodage). Défaut : off (comportement historique).
+    private final BooleanProperty waveNormalisation = new SimpleBooleanProperty(this, "waveNormalisation", false);
+    private double peakSonoScale = 1;
+    private double normalisedSonoScale = 1;
+
     // null tant qu'aucune erreur de chargement ; renseigné quand la Task échoue, vidé au prochain
     // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
     private final ReadOnlyStringWrapper errorMessage = new ReadOnlyStringWrapper(this, "errorMessage", null);
@@ -91,6 +101,7 @@ public final class AudioViewModel {
 
     public AudioViewModel() {
         audioFile.addListener((o, oldFile, newFile) -> loadAudio(newFile));
+        waveNormalisation.addListener((o, a, b) -> applySonoScale());
         playback.currentTimeProperty().addListener((o, a, b) -> updateTimeText());
         playback.durationProperty().addListener((o, a, b) -> updateTimeText());
         timeExpansion.addListener((o, a, b) -> updateTimeText());
@@ -118,6 +129,8 @@ public final class AudioViewModel {
         sample.set(null);
         spectrogramImage.set(null);
         spectrogram = null;
+        peakSonoScale = 1;
+        normalisedSonoScale = 1;
         sonoScale.set(1);
         errorMessage.set(null);
         ready.set(false);
@@ -135,7 +148,9 @@ public final class AudioViewModel {
             AudioAnalyzer.AnalyzedAudio result = task.getValue();
             spectrogram = result.spectrogram();
             sample.set(result.sample());
-            sonoScale.set(result.sonoScale());
+            peakSonoScale = result.sonoScale();
+            normalisedSonoScale = result.normalisedSonoScale();
+            applySonoScale();
             spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
             // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
             frequencyZoom.set(result.suggestedFrequencyZoom());
@@ -155,6 +170,15 @@ public final class AudioViewModel {
         Thread worker = new Thread(task, "audio-view-loader");
         worker.setDaemon(true);
         worker.start();
+    }
+
+    /**
+     * Publie dans {@link #sonoScaleProperty()} l'auto-échelle correspondant au mode courant :
+     * l'échelle normalisée (remplissage jusqu'au pic) si la normalisation visuelle est active, sinon
+     * l'échelle plafonnée par défaut. Rejouable à la bascule sans re-décoder le fichier.
+     */
+    private void applySonoScale() {
+        sonoScale.set(waveNormalisation.get() ? normalisedSonoScale : peakSonoScale);
     }
 
     /** Traduit en français les causes d'échec courantes de {@link AudioSample#load}. */
@@ -275,6 +299,16 @@ public final class AudioViewModel {
 
     public ReadOnlyDoubleProperty normalisationGainDbProperty() {
         return playback.normalisationGainDbProperty();
+    }
+
+    /**
+     * Normalisation <b>visuelle</b> du sonogramme (défaut {@code false}) : quand active, la forme
+     * d'onde est mise à l'échelle jusqu'à son pic réel plutôt que bornée par le plafond conservateur,
+     * de sorte qu'un enregistrement faible remplisse la gouttière. Distincte de la normalisation de
+     * lecture ({@link #normalisationProperty()}), qui n'agit que sur le volume.
+     */
+    public BooleanProperty waveNormalisationProperty() {
+        return waveNormalisation;
     }
 
     public double getNormalisationGainDb() {

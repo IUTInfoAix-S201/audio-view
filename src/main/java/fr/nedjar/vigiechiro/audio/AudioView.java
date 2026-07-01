@@ -427,6 +427,33 @@ public class AudioView extends BorderPane {
         return vm.getNormalisationGainDb();
     }
 
+    /// Normalisation **visuelle** du sonogramme. À `false` (défaut), l'amplitude de la forme d'onde est
+    /// auto-mise à l'échelle mais avec un **plafond de gain conservateur** : un enregistrement très
+    /// faible (cri de chiroptère ramené dans l'audible, pic à quelques millièmes) reste alors un tracé
+    /// **plat**. À `true`, le plafond est relevé pour que l'onde soit mise à l'échelle **jusqu'à son
+    /// pic réel** et remplisse la gouttière, quelle que soit la faiblesse du signal.
+    ///
+    /// Distincte de la normalisation de lecture ([#normalisationProperty()]) : celle-ci n'agit **que
+    /// sur les tracés** (le sonogramme), pas sur le volume, et n'altère ni le fichier ni la lecture.
+    /// La graduation d'amplitude (gouttière gauche) reflète l'échelle courante : elle indique donc le
+    /// pic réel du fichier quand la normalisation visuelle est active.
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `false`
+    public final BooleanProperty waveNormalisationProperty() {
+        return vm.waveNormalisationProperty();
+    }
+
+    /// `true` si la normalisation visuelle du sonogramme est active.
+    public final boolean isWaveNormalisation() {
+        return vm.waveNormalisationProperty().get();
+    }
+
+    /// Active (`true`) ou désactive (`false`, défaut) la normalisation visuelle du sonogramme. Voir
+    /// [#waveNormalisationProperty()].
+    public final void setWaveNormalisation(boolean value) {
+        vm.waveNormalisationProperty().set(value);
+    }
+
     /// Position courante du curseur dans le **temps du fichier**, en secondes.
     ///
     /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le

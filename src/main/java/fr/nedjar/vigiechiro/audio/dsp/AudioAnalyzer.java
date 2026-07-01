@@ -23,11 +23,26 @@ public final class AudioAnalyzer {
     /** Pas entre deux fenêtres FFT successives, en échantillons. */
     public static final int HOP = 256;
 
+    /**
+     * Plafond de gain de l'auto-échelle <b>par défaut</b> (conservateur) : borne l'amplification d'un
+     * fichier quasi muet pour ne pas transformer son plancher de bruit en pleine onde.
+     */
+    public static final double SONO_MAX_GAIN = 100.0;
+
+    /**
+     * Plafond de gain de l'auto-échelle en <b>normalisation visuelle</b> : bien plus haut, pour qu'un
+     * enregistrement réel mais très faible (pic à quelques millièmes, typique des chiroptères ramenés
+     * dans l'audible) remplisse quand même la gouttière. Reste fini pour éviter d'exploser un fichier
+     * numériquement muet. ~+74 dB, à comparer au plafond par défaut de +40 dB ({@link #SONO_MAX_GAIN}).
+     */
+    public static final double SONO_NORMALISED_MAX_GAIN = 5000.0;
+
     /** Résultat complet d'une analyse : tout ce dont la vue a besoin pour afficher l'audio. */
     public record AnalyzedAudio(
             AudioSample sample,
             Spectrogram spectrogram,
             double sonoScale,
+            double normalisedSonoScale,
             double suggestedFrequencyZoom,
             double durationSeconds) {}
 
@@ -39,15 +54,31 @@ public final class AudioAnalyzer {
         AudioSample sample = AudioSample.load(path);
         Spectrogram spectrogram = Spectrogram.compute(sample, FFT_SIZE, HOP);
         return new AnalyzedAudio(
-                sample, spectrogram, sonoScaleFor(sample), autoFrequencyZoom(spectrogram), sample.durationSeconds());
+                sample,
+                spectrogram,
+                sonoScaleFor(sample),
+                sonoScaleFor(sample, SONO_NORMALISED_MAX_GAIN),
+                autoFrequencyZoom(spectrogram),
+                sample.durationSeconds());
+    }
+
+    /**
+     * Auto-échelle verticale du sonogramme (plafond conservateur par défaut, {@link #SONO_MAX_GAIN}).
+     *
+     * @see #sonoScaleFor(AudioSample, double)
+     */
+    public static double sonoScaleFor(AudioSample s) {
+        return sonoScaleFor(s, SONO_MAX_GAIN);
     }
 
     /**
      * Auto-échelle verticale du sonogramme : facteur tel que le pic du fichier remplisse ~95 % de la
      * demi-hauteur. Les enregistrements de chiroptères étant de faible amplitude, sans cela la forme
-     * d'onde resterait minuscule. Plafonné pour ne pas amplifier démesurément un fichier quasi muet.
+     * d'onde resterait minuscule. Le gain est plafonné à {@code maxGain} pour ne pas amplifier
+     * démesurément un fichier quasi muet : {@link #SONO_MAX_GAIN} en affichage par défaut (prudent),
+     * {@link #SONO_NORMALISED_MAX_GAIN} en normalisation visuelle (remplissage jusqu'au pic réel).
      */
-    public static double sonoScaleFor(AudioSample s) {
+    public static double sonoScaleFor(AudioSample s, double maxGain) {
         float peak = 0;
         for (float v : s.samples()) {
             float a = Math.abs(v);
@@ -55,7 +86,7 @@ public final class AudioAnalyzer {
                 peak = a;
             }
         }
-        return peak > 1e-6f ? Math.min(0.95 / peak, 100.0) : 1.0;
+        return peak > 1e-6f ? Math.min(0.95 / peak, maxGain) : 1.0;
     }
 
     /**

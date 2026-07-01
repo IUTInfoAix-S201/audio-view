@@ -134,6 +134,7 @@ Pensez à appeler `audioView.dispose()` à la fermeture pour libérer le périph
 | `loopProperty()` / `setLoop(boolean)` | `BooleanProperty` | Lecture en **boucle** (défaut : off → arrêt en fin d'extrait). |
 | `normalisationProperty()` / `setNormalisation(boolean)` | `BooleanProperty` | **Normalisation peak** du volume à la lecture (gain au rendu, sans modifier le fichier ; défaut : off). |
 | `normalisationGainDbProperty()` | `ReadOnlyDoubleProperty` | Gain de normalisation effectivement appliqué, en dB (0 si désactivé). |
+| `waveNormalisationProperty()` / `setWaveNormalisation(boolean)` | `BooleanProperty` | **Normalisation visuelle** du sonogramme : met la forme d'onde à l'échelle jusqu'à son pic réel (plafond de gain relevé) pour qu'un enregistrement faible remplisse la gouttière au lieu de rester plat. N'agit que sur le tracé, pas sur le volume ; défaut : off. |
 | `currentTimeProperty()` | `ReadOnlyDoubleProperty` | Position de lecture en secondes (curseur). |
 | `durationProperty()` | `ReadOnlyDoubleProperty` | Durée totale en secondes. |
 | `timeZoomProperty()` | `DoubleProperty` | Facteur de zoom temporel (1 = vue complète). |
