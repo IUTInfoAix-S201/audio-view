@@ -264,7 +264,10 @@ public final class AudioViewModel {
     }
 
     public static String formatAxis(double value, double step) {
-        int decimals = step >= 1 ? 0 : (int) Math.min(3, Math.ceil(-Math.log10(step)));
+        // Nombre de décimales calé sur le pas. Plafond à 4 (et non 3) : sous forte normalisation
+        // visuelle, l'échelle d'amplitude d'un signal très faible devient minuscule (pas ~5e-4), et un
+        // plafond à 3 écrasait toutes les graduations à « 0.000 » / arrondissait 0.0005 en « 0.001 ».
+        int decimals = step >= 1 ? 0 : (int) Math.min(4, Math.ceil(-Math.log10(step)));
         return String.format("%." + decimals + "f", value);
     }
 
