@@ -58,6 +58,11 @@ import javafx.scene.paint.Color;
  * view.setPlaying(true);
  * }</pre>
  */
+// AudioView est la FAÇADE d'API publique du composant : une longue liste d'accesseurs fins qui
+// délèguent au ViewModel (property/is/set par réglage). Son NCSS croît mécaniquement à chaque
+// nouvelle propriété exposée (ici waveNormalisation), sans complexité réelle : la métrique NcssCount
+// n'y est pas un signal utile, comme pour AudioViewModel (déjà suppressé). Suppression assumée.
+@SuppressWarnings("PMD.NcssCount")
 public class AudioView extends BorderPane {
 
     /** Largeur de la gouttière gauche, utilisée pour le binding responsive de la légende. */
