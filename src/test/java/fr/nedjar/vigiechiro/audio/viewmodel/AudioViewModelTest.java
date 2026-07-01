@@ -45,6 +45,9 @@ class AudioViewModelTest {
         assertThat(AudioViewModel.niceStep(2, 6)).isEqualTo(0.5);
         assertThat(AudioViewModel.formatAxis(45.0, 5.0)).isEqualTo("45");
         assertThat(AudioViewModel.formatAxis(0.5, 0.5)).matches("0[.,]5");
+        // Pas minuscule (amplitude sous forte normalisation visuelle) : 4 décimales, pas d'écrasement
+        // à « 0.000 » ni d'arrondi trompeur de 0.0005 en 0.001.
+        assertThat(AudioViewModel.formatAxis(0.0005, 0.0005)).matches("0[.,]0005");
     }
 
     @Test
