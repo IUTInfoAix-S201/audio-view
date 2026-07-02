@@ -73,6 +73,17 @@ public final class AudioViewModel {
     private double peakSonoScale = 1;
     private double normalisedSonoScale = 1;
 
+    // Normalisation VISUELLE du spectrogramme : quand active, la fenêtre d'affichage dB (qui mappe les
+    // magnitudes vers la colormap) est recalée sur le pic RÉEL du signal au lieu du plafond fixe MAX_DB,
+    // en gardant la même largeur de dynamique. Sans cela, un enregistrement faible (pic bien sous MAX_DB)
+    // s'affiche tout en noir. La fenêtre courante [spectroMinDb, spectroMaxDb] est publiée pour que la
+    // légende dB la reflète. Défaut : off (fenêtre fixe historique).
+    private final BooleanProperty spectrogramNormalisation =
+            new SimpleBooleanProperty(this, "spectrogramNormalisation", false);
+    private double spectroPeakDb = MAX_DB;
+    private final ReadOnlyDoubleWrapper spectroMinDb = new ReadOnlyDoubleWrapper(this, "spectroMinDb", MIN_DB);
+    private final ReadOnlyDoubleWrapper spectroMaxDb = new ReadOnlyDoubleWrapper(this, "spectroMaxDb", MAX_DB);
+
     // null tant qu'aucune erreur de chargement ; renseigné quand la Task échoue, vidé au prochain
     // (re)chargement. La vue affiche un overlay quand non null (cf. AudioView + audio-view.css).
     private final ReadOnlyStringWrapper errorMessage = new ReadOnlyStringWrapper(this, "errorMessage", null);
@@ -102,6 +113,7 @@ public final class AudioViewModel {
     public AudioViewModel() {
         audioFile.addListener((o, oldFile, newFile) -> loadAudio(newFile));
         waveNormalisation.addListener((o, a, b) -> applySonoScale());
+        spectrogramNormalisation.addListener((o, a, b) -> applySpectroRange());
         playback.currentTimeProperty().addListener((o, a, b) -> updateTimeText());
         playback.durationProperty().addListener((o, a, b) -> updateTimeText());
         timeExpansion.addListener((o, a, b) -> updateTimeText());
@@ -132,6 +144,9 @@ public final class AudioViewModel {
         peakSonoScale = 1;
         normalisedSonoScale = 1;
         sonoScale.set(1);
+        spectroPeakDb = MAX_DB;
+        spectroMinDb.set(MIN_DB);
+        spectroMaxDb.set(MAX_DB);
         errorMessage.set(null);
         ready.set(false);
         if (path == null) {
@@ -151,7 +166,8 @@ public final class AudioViewModel {
             peakSonoScale = result.sonoScale();
             normalisedSonoScale = result.normalisedSonoScale();
             applySonoScale();
-            spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
+            spectroPeakDb = result.spectroPeakDb();
+            applySpectroRange();
             // Cale par défaut la vue fréquentielle sur la bande réellement utilisée.
             frequencyZoom.set(result.suggestedFrequencyZoom());
             // Alimente la lecture depuis les échantillons déjà décodés (mono, [-1, 1]) : permet la
@@ -179,6 +195,31 @@ public final class AudioViewModel {
      */
     private void applySonoScale() {
         sonoScale.set(waveNormalisation.get() ? normalisedSonoScale : peakSonoScale);
+    }
+
+    /**
+     * Publie la fenêtre d'affichage dB du spectrogramme selon le mode courant, puis reconstruit l'image.
+     * En normalisation visuelle, la fenêtre est recalée sur le pic réel ({@code [pic - dynamique, pic]},
+     * même largeur que la fenêtre fixe) pour révéler un signal faible ; sinon elle vaut {@code [MIN_DB,
+     * MAX_DB]}. Rejouable à la bascule sans re-décoder (le {@link Spectrogram} est conservé).
+     */
+    private void applySpectroRange() {
+        if (spectrogramNormalisation.get()) {
+            spectroMaxDb.set(spectroPeakDb);
+            spectroMinDb.set(spectroPeakDb - (MAX_DB - MIN_DB));
+        } else {
+            spectroMaxDb.set(MAX_DB);
+            spectroMinDb.set(MIN_DB);
+        }
+        rebuildSpectrogramImage();
+    }
+
+    /** Reconstruit l'image du spectrogramme depuis le {@link Spectrogram} conservé, colormap + fenêtre dB courantes. */
+    private void rebuildSpectrogramImage() {
+        if (spectrogram != null) {
+            spectrogramImage.set(
+                    SpectrogramImageFactory.build(spectrogram, colormap, spectroMinDb.get(), spectroMaxDb.get()));
+        }
     }
 
     /** Traduit en français les causes d'échec courantes de {@link AudioSample#load}. */
@@ -277,9 +318,7 @@ public final class AudioViewModel {
             return;
         }
         this.colormap = colormap;
-        if (spectrogram != null) {
-            spectrogramImage.set(SpectrogramImageFactory.build(spectrogram, colormap, MIN_DB, MAX_DB));
-        }
+        rebuildSpectrogramImage();
     }
 
     // ----- Accesseurs (pour la vue) -----
@@ -312,6 +351,33 @@ public final class AudioViewModel {
      */
     public BooleanProperty waveNormalisationProperty() {
         return waveNormalisation;
+    }
+
+    /**
+     * Normalisation <b>visuelle</b> du spectrogramme (défaut {@code false}) : quand active, la fenêtre
+     * d'affichage dB est recalée sur le pic réel du signal, pour qu'un enregistrement faible ne
+     * s'affiche pas tout en noir. N'agit que sur le tracé (mapping magnitude → couleur), pas sur le son.
+     */
+    public BooleanProperty spectrogramNormalisationProperty() {
+        return spectrogramNormalisation;
+    }
+
+    /** Borne basse (dB) de la fenêtre d'affichage courante du spectrogramme (pour la légende). */
+    public ReadOnlyDoubleProperty spectroMinDbProperty() {
+        return spectroMinDb.getReadOnlyProperty();
+    }
+
+    /** Borne haute (dB) de la fenêtre d'affichage courante du spectrogramme (pour la légende). */
+    public ReadOnlyDoubleProperty spectroMaxDbProperty() {
+        return spectroMaxDb.getReadOnlyProperty();
+    }
+
+    public double getSpectroMinDb() {
+        return spectroMinDb.get();
+    }
+
+    public double getSpectroMaxDb() {
+        return spectroMaxDb.get();
     }
 
     public double getNormalisationGainDb() {

@@ -135,6 +135,7 @@ Pensez à appeler `audioView.dispose()` à la fermeture pour libérer le périph
 | `normalisationProperty()` / `setNormalisation(boolean)` | `BooleanProperty` | **Normalisation peak** du volume à la lecture (gain au rendu, sans modifier le fichier ; défaut : off). |
 | `normalisationGainDbProperty()` | `ReadOnlyDoubleProperty` | Gain de normalisation effectivement appliqué, en dB (0 si désactivé). |
 | `waveNormalisationProperty()` / `setWaveNormalisation(boolean)` | `BooleanProperty` | **Normalisation visuelle** du sonogramme : met la forme d'onde à l'échelle jusqu'à son pic réel (plafond de gain relevé) pour qu'un enregistrement faible remplisse la gouttière au lieu de rester plat. N'agit que sur le tracé, pas sur le volume ; défaut : off. |
+| `spectrogramNormalisationProperty()` / `setSpectrogramNormalisation(boolean)` | `BooleanProperty` | **Normalisation visuelle** du spectrogramme : recale la fenêtre d'affichage dB sur le pic réel du signal (même dynamique) pour qu'un enregistrement faible révèle sa structure au lieu de s'afficher tout en noir. La légende dB reflète la fenêtre courante ; défaut : off. |
 | `currentTimeProperty()` | `ReadOnlyDoubleProperty` | Position de lecture en secondes (curseur). |
 | `durationProperty()` | `ReadOnlyDoubleProperty` | Durée totale en secondes. |
 | `timeZoomProperty()` | `DoubleProperty` | Facteur de zoom temporel (1 = vue complète). |

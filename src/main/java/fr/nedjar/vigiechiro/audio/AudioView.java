@@ -396,6 +396,32 @@ public class AudioView extends BorderPane {
         vm.waveNormalisationProperty().set(value);
     }
 
+    /// Normalisation **visuelle** du spectrogramme. À `false` (défaut), les magnitudes sont mappées sur
+    /// la colormap avec une **fenêtre dB fixe** : un enregistrement faible, dont toutes les magnitudes
+    /// sont bien en dessous du plafond, s'affiche alors **tout en noir**. À `true`, la fenêtre dB est
+    /// **recalée sur le pic réel** du signal (même largeur de dynamique), de sorte que le spectrogramme
+    /// d'un signal faible révèle sa structure au lieu de rester noir.
+    ///
+    /// N'agit que sur le **tracé** (mapping magnitude → couleur), pas sur le son. La légende dB reflète
+    /// la fenêtre courante — elle indique donc les niveaux réels du fichier quand la normalisation est
+    /// active. Pendant de [#waveNormalisationProperty()] pour le spectrogramme.
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `false`
+    public final BooleanProperty spectrogramNormalisationProperty() {
+        return vm.spectrogramNormalisationProperty();
+    }
+
+    /// `true` si la normalisation visuelle du spectrogramme est active.
+    public final boolean isSpectrogramNormalisation() {
+        return vm.spectrogramNormalisationProperty().get();
+    }
+
+    /// Active (`true`) ou désactive (`false`, défaut) la normalisation visuelle du spectrogramme. Voir
+    /// [#spectrogramNormalisationProperty()].
+    public final void setSpectrogramNormalisation(boolean value) {
+        vm.spectrogramNormalisationProperty().set(value);
+    }
+
     /// Position courante du curseur dans le **temps du fichier**, en secondes.
     ///
     /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le
