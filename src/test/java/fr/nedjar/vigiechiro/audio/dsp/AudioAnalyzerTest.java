@@ -98,6 +98,24 @@ class AudioAnalyzerTest {
     }
 
     @Test
+    void spectroPicDbCroitAvecLeNiveauDuSignal() throws Exception {
+        // Le pic dB du spectrogramme suit le niveau : un signal fort a un pic plus haut qu'un faible.
+        // C'est ce pic qui sert à recaler la fenêtre dB (normalisation visuelle du spectro).
+        double fort = AudioAnalyzer.spectroPeakDbFor(Spectrogram.compute(
+                AudioSample.load(ecrireWavMono(8000f, 0.2, (short) 16384)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP));
+        double faible = AudioAnalyzer.spectroPeakDbFor(Spectrogram.compute(
+                AudioSample.load(ecrireWavMono(8000f, 0.2, (short) 64)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP));
+        assertThat(fort).isGreaterThan(faible).isFinite();
+    }
+
+    @Test
+    void analyseFournitLePicDbDuSpectrogramme() throws Exception {
+        // analyze() pré-calcule le pic dB, cohérent avec le calcul direct sur son spectrogramme.
+        AudioAnalyzer.AnalyzedAudio r = AudioAnalyzer.analyze(ecrireWavMono(8000f, 0.2, (short) 64));
+        assertThat(r.spectroPeakDb()).isEqualTo(AudioAnalyzer.spectroPeakDbFor(r.spectrogram()));
+    }
+
+    @Test
     void sonoScaleSurFichierSatureVautMoinsD1() throws Exception {
         // Pic max = 32767/32768 ≈ 1 → facteur ≈ 0.95 / 1 = 0.95.
         // Tue les mutants qui inverseraient le ratio peak/0.95.

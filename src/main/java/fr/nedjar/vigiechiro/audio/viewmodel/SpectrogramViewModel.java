@@ -55,6 +55,14 @@ public final class SpectrogramViewModel {
         return session.windowDurationBinding();
     }
 
+    public ReadOnlyDoubleProperty spectroMinDbProperty() {
+        return session.spectroMinDbProperty();
+    }
+
+    public ReadOnlyDoubleProperty spectroMaxDbProperty() {
+        return session.spectroMaxDbProperty();
+    }
+
     // ----- Façades scalaires -----
 
     public WritableImage getSpectrogramImage() {
@@ -83,6 +91,14 @@ public final class SpectrogramViewModel {
 
     public double expansionFactor() {
         return session.expansionFactor();
+    }
+
+    public double spectroMinDb() {
+        return session.getSpectroMinDb();
+    }
+
+    public double spectroMaxDb() {
+        return session.getSpectroMaxDb();
     }
 
     public double currentTime() {

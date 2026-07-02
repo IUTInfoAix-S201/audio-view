@@ -51,6 +51,34 @@ class AudioViewModelToolkitTest extends ApplicationTest {
         interact(vm::dispose);
     }
 
+    @Test
+    void normalisationVisuelleRecaleLaFenetreDbDuSpectrogramme() throws Exception {
+        AudioViewModel vm = new AudioViewModel();
+        // Fichier très faible : son pic dB est bien sous le plafond fixe MAX_DB (d'où le spectro noir).
+        Path wav = ecrireWavMonoConstant(8000f, 0.2, (short) 1);
+
+        interact(() -> vm.audioFileProperty().set(wav));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, vm::isReady);
+
+        // Par défaut : fenêtre dB fixe [MIN_DB, MAX_DB].
+        assertThat(vm.getSpectroMinDb()).isEqualTo(AudioViewModel.MIN_DB);
+        assertThat(vm.getSpectroMaxDb()).isEqualTo(AudioViewModel.MAX_DB);
+
+        // Normalisation visuelle : la fenêtre se recale sur le pic réel (haut < MAX_DB pour ce signal
+        // faible), en gardant la même largeur de dynamique.
+        interact(() -> vm.spectrogramNormalisationProperty().set(true));
+        assertThat(vm.getSpectroMaxDb()).isLessThan(AudioViewModel.MAX_DB);
+        assertThat(vm.getSpectroMaxDb() - vm.getSpectroMinDb())
+                .isEqualTo(AudioViewModel.MAX_DB - AudioViewModel.MIN_DB);
+        assertThat(vm.getSpectrogramImage()).isNotNull();
+
+        // Retour arrière : fenêtre fixe restaurée.
+        interact(() -> vm.spectrogramNormalisationProperty().set(false));
+        assertThat(vm.getSpectroMaxDb()).isEqualTo(AudioViewModel.MAX_DB);
+
+        interact(vm::dispose);
+    }
+
     private static Path ecrireWavMonoConstant(float sampleRate, double seconds, short value) throws IOException {
         int n = (int) (sampleRate * seconds);
         byte[] data = new byte[n * 2];

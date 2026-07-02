@@ -108,6 +108,13 @@ public final class SpectrogramView extends StackPane {
         vm.frequencyZoomProperty().addListener(redraw);
         vm.currentTimeProperty().addListener((o, a, b) -> positionCursor());
 
+        // La fenêtre dB courante peut changer (normalisation visuelle du spectro) : la légende doit
+        // refléter les vraies bornes, on la reconstruit alors. Une fois construite avec les valeurs du VM.
+        ChangeListener<Object> rebuildLegend = (o, a, b) -> buildColorbarLegend();
+        vm.spectroMinDbProperty().addListener(rebuildLegend);
+        vm.spectroMaxDbProperty().addListener(rebuildLegend);
+        buildColorbarLegend();
+
         setOnMousePressed(e -> seekFromX(e.getX()));
     }
 
@@ -259,12 +266,16 @@ public final class SpectrogramView extends StackPane {
         legend.getChildren().add(bande);
         colorbarBande = bande;
 
-        double range = AudioViewModel.MAX_DB - AudioViewModel.MIN_DB;
+        // Fenêtre dB courante : celle du VM (recalée sur le pic en normalisation visuelle) s'il est
+        // branché, sinon la fenêtre fixe par défaut (légende construite avant bindTo).
+        double minDb = vm == null ? AudioViewModel.MIN_DB : vm.spectroMinDb();
+        double maxDb = vm == null ? AudioViewModel.MAX_DB : vm.spectroMaxDb();
+        double range = maxDb - minDb;
         double step = AudioViewModel.niceStep(range, 4);
         int nTicks = (int) Math.round(range / step);
         for (int i = 0; i <= nTicks; i++) {
-            double db = AudioViewModel.MIN_DB + i * step;
-            double y = stripTop + barH * (1 - (db - AudioViewModel.MIN_DB) / range);
+            double db = minDb + i * step;
+            double y = stripTop + barH * (1 - (db - minDb) / range);
             Label valeur = new Label(AudioViewModel.formatAxis(db, step));
             valeur.setLayoutX(2);
             valeur.setLayoutY(y - 8);

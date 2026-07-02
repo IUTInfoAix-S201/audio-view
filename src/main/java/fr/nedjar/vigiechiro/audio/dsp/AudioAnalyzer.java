@@ -44,6 +44,7 @@ public final class AudioAnalyzer {
             double sonoScale,
             double normalisedSonoScale,
             double suggestedFrequencyZoom,
+            double spectroPeakDb,
             double durationSeconds) {}
 
     /**
@@ -59,7 +60,24 @@ public final class AudioAnalyzer {
                 sonoScaleFor(sample),
                 sonoScaleFor(sample, SONO_NORMALISED_MAX_GAIN),
                 autoFrequencyZoom(spectrogram),
+                spectroPeakDbFor(spectrogram),
                 sample.durationSeconds());
+    }
+
+    /**
+     * Magnitude maximale du spectrogramme, en dB (pic réel du signal). Sert à <b>caler la fenêtre
+     * dynamique dB</b> du spectrogramme sur le signal (normalisation visuelle du spectro), pour qu'un
+     * enregistrement faible ne s'affiche pas en noir. Renvoie {@link AudioViewModel#MAX_DB} si le
+     * spectrogramme est vide ou muet (pas de pic exploitable).
+     */
+    public static double spectroPeakDbFor(Spectrogram spec) {
+        double peak = Double.NEGATIVE_INFINITY;
+        for (int f = 0; f < spec.frameCount(); f++) {
+            for (int b = 0; b < spec.binCount(); b++) {
+                peak = Math.max(peak, spec.magnitudeDb(f, b));
+            }
+        }
+        return Double.isFinite(peak) ? peak : AudioViewModel.MAX_DB;
     }
 
     /**
