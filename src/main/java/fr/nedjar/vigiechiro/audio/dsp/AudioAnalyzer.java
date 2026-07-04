@@ -141,4 +141,160 @@ public final class AudioAnalyzer {
         }
         return Math.max(1, Math.min(64, 1.0 / fraction));
     }
+
+    // ----- Grandeurs acoustiques par cri (issue #50) -----
+    //
+    // Calculs purs sur le Spectrogram déjà calculé, en unités FICHIER (Hz fichier, temps fichier).
+    // La conversion vers le temps réel (fréquence × facteur, temps ÷ facteur) est faite par le
+    // ViewModel qui connaît timeExpansionFactor. Toutes les fonctions bornent l'intervalle de trames
+    // [fromFrame, toFrame] au spectrogramme, ce qui permet de restreindre le calcul à la fenêtre d'un
+    // cri (temps_debut/fin) ou de couvrir tout le fichier (0 .. frameCount-1).
+
+    /**
+     * Seuil (en dB sous le pic de la fenêtre analysée) en-dessous duquel une trame est considérée
+     * <b>inactive</b>. Sert à délimiter le cri (durée) et à repérer sa fin (fréquence terminale). Choisi
+     * assez large pour englober un cri de chiroptère au-dessus du plancher de bruit sans happer les
+     * trames quasi muettes des bords.
+     */
+    public static final double MEASURE_ACTIVE_RANGE_DB = 20.0;
+
+    /**
+     * Plancher absolu (dBFS) en-dessous duquel une fenêtre est considérée <b>sans signal</b>. Évite que
+     * le seuil <i>relatif</i> ({@link #MEASURE_ACTIVE_RANGE_DB} sous le pic) ne déclare « actif » un
+     * fichier silencieux (dont le pic est déjà au plancher anti-log ≈ -180 dBFS). Placé sous le niveau
+     * d'un vrai cri ramené dans l'audible mais bien au-dessus du silence numérique.
+     */
+    public static final double MEASURE_FLOOR_DB = -80.0;
+
+    /**
+     * Indice de trame STFT couvrant l'instant {@code tSeconds} (temps fichier), pour convertir une
+     * fenêtre temporelle en intervalle de trames. Non borné (le clamp est fait par l'appelant).
+     */
+    public static int frameForTime(double tSeconds, double sampleRate, int hop) {
+        if (hop <= 0 || sampleRate <= 0) {
+            return 0;
+        }
+        return (int) Math.round(tSeconds * sampleRate / hop);
+    }
+
+    /** Fréquence (Hz, temps fichier) associée au bin {@code bin} : {@code bin · sampleRate / fftSize}. */
+    public static double binFrequencyHz(int bin, double sampleRate, int fftSize) {
+        return fftSize <= 0 ? 0 : bin * sampleRate / fftSize;
+    }
+
+    /**
+     * <b>FME — Fréquence du Maximum d'Énergie</b> (Hz, temps fichier) sur l'intervalle de trames
+     * {@code [fromFrame, toFrame]} (inclus, borné au spectrogramme) : fréquence du bin de magnitude
+     * maximale. C'est le discriminant acoustique de référence. Renvoie {@code NaN} si le spectrogramme
+     * est vide ou l'intervalle dégénéré.
+     */
+    public static double peakFrequencyHz(Spectrogram spec, double sampleRate, int fftSize, int fromFrame, int toFrame) {
+        int bin = peakBin(spec, fromFrame, toFrame);
+        return bin < 0 ? Double.NaN : binFrequencyHz(bin, sampleRate, fftSize);
+    }
+
+    /**
+     * <b>Fréquence terminale</b> (Hz, temps fichier) — heuristique de fin de balayage FM : fréquence
+     * dominante de la <b>dernière trame active</b> de l'intervalle (trame dont le pic dépasse {@code pic
+     * de la fenêtre − }{@link #MEASURE_ACTIVE_RANGE_DB}). Approximation volontairement simple : sur un
+     * cri à fréquence quasi constante elle rejoint la FME. Renvoie {@code NaN} si aucune trame active.
+     */
+    public static double terminalFrequencyHz(
+            Spectrogram spec, double sampleRate, int fftSize, int fromFrame, int toFrame) {
+        int f0 = Math.max(0, fromFrame);
+        int f1 = Math.min(spec.frameCount() - 1, toFrame);
+        if (spec.binCount() == 0 || f1 < f0) {
+            return Double.NaN;
+        }
+        double peak = windowPeakDb(spec, f0, f1);
+        if (peak < MEASURE_FLOOR_DB) {
+            return Double.NaN;
+        }
+        double threshold = peak - MEASURE_ACTIVE_RANGE_DB;
+        for (int f = f1; f >= f0; f--) {
+            int bin = frameDominantBin(spec, f);
+            if (spec.magnitudeDb(f, bin) >= threshold) {
+                return binFrequencyHz(bin, sampleRate, fftSize);
+            }
+        }
+        return Double.NaN;
+    }
+
+    /**
+     * <b>Durée active</b> (secondes, temps fichier) sur l'intervalle : de la première à la dernière
+     * trame <b>active</b> (pic ≥ {@code pic de la fenêtre − }{@link #MEASURE_ACTIVE_RANGE_DB}), largeur
+     * d'une trame incluse ({@code hop}). Mesure le cri sur le signal plutôt que sur les seules bornes
+     * fournies. Renvoie {@code 0} si aucune trame active.
+     */
+    public static double activeDurationSeconds(
+            Spectrogram spec, double sampleRate, int hop, int fromFrame, int toFrame) {
+        int f0 = Math.max(0, fromFrame);
+        int f1 = Math.min(spec.frameCount() - 1, toFrame);
+        if (spec.binCount() == 0 || f1 < f0 || sampleRate <= 0) {
+            return 0;
+        }
+        double peak = windowPeakDb(spec, f0, f1);
+        if (peak < MEASURE_FLOOR_DB) {
+            return 0;
+        }
+        double threshold = peak - MEASURE_ACTIVE_RANGE_DB;
+        int first = -1;
+        int last = -1;
+        for (int f = f0; f <= f1; f++) {
+            int bin = frameDominantBin(spec, f);
+            if (spec.magnitudeDb(f, bin) >= threshold) {
+                if (first < 0) {
+                    first = f;
+                }
+                last = f;
+            }
+        }
+        return first < 0 ? 0 : (last - first + 1) * hop / sampleRate;
+    }
+
+    /** Bin de magnitude maximale, tous frames confondus, sur {@code [fromFrame, toFrame]} ; {@code -1} si vide. */
+    private static int peakBin(Spectrogram spec, int fromFrame, int toFrame) {
+        int f0 = Math.max(0, fromFrame);
+        int f1 = Math.min(spec.frameCount() - 1, toFrame);
+        if (spec.binCount() == 0 || f1 < f0) {
+            return -1;
+        }
+        int best = -1;
+        double bestDb = Double.NEGATIVE_INFINITY;
+        for (int f = f0; f <= f1; f++) {
+            for (int b = 0; b < spec.binCount(); b++) {
+                double m = spec.magnitudeDb(f, b);
+                if (m > bestDb) {
+                    bestDb = m;
+                    best = b;
+                }
+            }
+        }
+        return bestDb < MEASURE_FLOOR_DB ? -1 : best;
+    }
+
+    /** Bin dominant (magnitude max) d'une trame donnée. */
+    private static int frameDominantBin(Spectrogram spec, int frame) {
+        int best = 0;
+        double bestDb = Double.NEGATIVE_INFINITY;
+        for (int b = 0; b < spec.binCount(); b++) {
+            double m = spec.magnitudeDb(frame, b);
+            if (m > bestDb) {
+                bestDb = m;
+                best = b;
+            }
+        }
+        return best;
+    }
+
+    /** Magnitude dB maximale sur l'intervalle de trames {@code [f0, f1]} (bornes déjà validées). */
+    private static double windowPeakDb(Spectrogram spec, int f0, int f1) {
+        double peak = Double.NEGATIVE_INFINITY;
+        for (int f = f0; f <= f1; f++) {
+            for (int b = 0; b < spec.binCount(); b++) {
+                peak = Math.max(peak, spec.magnitudeDb(f, b));
+            }
+        }
+        return peak;
+    }
 }

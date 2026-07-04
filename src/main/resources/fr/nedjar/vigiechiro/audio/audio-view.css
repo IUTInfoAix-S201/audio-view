@@ -58,6 +58,14 @@
   -fx-stroke-width: 1.5;
 }
 
+/* Bande de surlignage d'un cri (issue #52) : zone temporelle mise en évidence sur l'onde et le
+   spectrogramme. Ambre translucide pour rester lisible sous le curseur rouge sans masquer le tracé. */
+.audio-view-highlight {
+  -fx-fill: rgba(255, 209, 102, 0.22);
+  -fx-stroke: rgba(255, 209, 102, 0.85);
+  -fx-stroke-width: 1;
+}
+
 /* Axes : grille, marques, libellés */
 .audio-view-grid {
   -fx-stroke: rgba(255, 255, 255, 0.10);
@@ -156,6 +164,12 @@
 
 .audio-view:light .audio-view-sono-area {
   -fx-border-color: rgba(0, 0, 0, 0.50);
+}
+
+/* Surlignage en thème clair : ambre plus soutenu pour rester visible sur fond pâle. */
+.audio-view:light .audio-view-highlight {
+  -fx-fill: rgba(230, 145, 20, 0.20);
+  -fx-stroke: rgba(200, 125, 10, 0.85);
 }
 
 /* ============================================================================

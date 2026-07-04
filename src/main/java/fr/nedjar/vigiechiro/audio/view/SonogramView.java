@@ -17,6 +17,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
+import javafx.scene.shape.Rectangle;
 
 /**
  * Sous-vue du tracé sonogramme (custom control fx:root {@code extends StackPane}). Issue #9.
@@ -46,6 +47,9 @@ public final class SonogramView extends StackPane {
 
     @FXML
     private Canvas canvas;
+
+    @FXML
+    private Rectangle highlight;
 
     @FXML
     private Line cursor;
@@ -90,6 +94,8 @@ public final class SonogramView extends StackPane {
         vm.sonoScaleProperty().addListener(redraw);
         waveColor.addListener(redraw);
         vm.currentTimeProperty().addListener((o, a, b) -> positionCursor());
+        // La sélection (fenêtre surlignée d'un cri) change → repositionner la bande (issue #52).
+        vm.highlightWindowFileBinding().addListener((o, a, b) -> positionHighlight());
 
         setOnMousePressed(e -> seekFromX(e.getX()));
     }
@@ -99,6 +105,7 @@ public final class SonogramView extends StackPane {
     private void render() {
         drawCanvas();
         drawAxes();
+        positionHighlight();
         positionCursor();
     }
 
@@ -207,6 +214,19 @@ public final class SonogramView extends StackPane {
         boolean show = rel >= 0 && rel <= 1;
         double plotW = canvas.getWidth() - AXIS_LEFT;
         AxisNodes.positionCursor(cursor, show, AXIS_LEFT + rel * plotW, 0, canvas.getHeight());
+    }
+
+    /** Positionne la bande de surlignage du cri (temps fichier → pixels), même repère que le curseur. */
+    private void positionHighlight() {
+        if (vm == null) {
+            return;
+        }
+        double[] hw = vm.highlightWindowFile();
+        double plotW = canvas.getWidth() - AXIS_LEFT;
+        double[] span = hw == null
+                ? null
+                : AxisNodes.highlightSpan(hw[0], hw[1], vm.windowStart(), vm.windowDuration(), AXIS_LEFT, plotW);
+        AxisNodes.positionHighlight(highlight, span, 0, canvas.getHeight());
     }
 
     private void seekFromX(double mouseX) {

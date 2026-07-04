@@ -144,6 +144,82 @@ class AudioAnalyzerTest {
         assertThat(zoom).isEqualTo(1.0);
     }
 
+    // ----- Grandeurs acoustiques par cri (issue #50) -----
+
+    @Test
+    void fmeRetrouveLaFrequenceDominante() throws Exception {
+        // Sinus pur à 500 Hz (8 kHz, Δf = 8000/1024 ≈ 7,8 Hz) : le bin de max d'énergie retombe sur
+        // ~500 Hz. Grandeur de référence pour trier les cris.
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireSinusWav(8000f, 1.0, 500)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        double fme = AudioAnalyzer.peakFrequencyHz(spec, 8000, AudioAnalyzer.FFT_SIZE, 0, spec.frameCount() - 1);
+        assertThat(fme).isCloseTo(500, within(15.0));
+    }
+
+    @Test
+    void fmeSurFenetreRestreinteResteCoherente() throws Exception {
+        // La FME calculée sur un sous-intervalle de trames (le « cri ») retrouve la même fréquence :
+        // c'est ce qui permet une FME par observation.
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireSinusWav(8000f, 1.0, 500)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        int n = spec.frameCount();
+        double fme = AudioAnalyzer.peakFrequencyHz(spec, 8000, AudioAnalyzer.FFT_SIZE, n / 4, 3 * n / 4);
+        assertThat(fme).isCloseTo(500, within(15.0));
+    }
+
+    @Test
+    void fmeSurSilenceEstNaN() throws Exception {
+        // Fichier muet : pic sous le plancher absolu → aucune fréquence exploitable → NaN.
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireWavMono(8000f, 0.3, (short) 0)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        double fme = AudioAnalyzer.peakFrequencyHz(spec, 8000, AudioAnalyzer.FFT_SIZE, 0, spec.frameCount() - 1);
+        assertThat(fme).isNaN();
+    }
+
+    @Test
+    void frequenceTerminaleSurTonConstantRejointLaFME() throws Exception {
+        // Sur un cri à fréquence quasi constante, la fréquence terminale (dernière trame active)
+        // retombe sur la fréquence dominante.
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireSinusWav(8000f, 1.0, 500)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        double term = AudioAnalyzer.terminalFrequencyHz(spec, 8000, AudioAnalyzer.FFT_SIZE, 0, spec.frameCount() - 1);
+        assertThat(term).isCloseTo(500, within(15.0));
+    }
+
+    @Test
+    void frequenceTerminaleSurSilenceEstNaN() throws Exception {
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireWavMono(8000f, 0.3, (short) 0)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        double term = AudioAnalyzer.terminalFrequencyHz(spec, 8000, AudioAnalyzer.FFT_SIZE, 0, spec.frameCount() - 1);
+        assertThat(term).isNaN();
+    }
+
+    @Test
+    void dureeActiveCouvreLeSignalConstant() throws Exception {
+        // Tone constant de 1 s : la durée active mesurée sur l'énergie couvre presque tout le fichier
+        // (bornée par le dernier début de trame STFT), donc entre 0,8 s et la durée du fichier.
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireSinusWav(8000f, 1.0, 500)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        double dur = AudioAnalyzer.activeDurationSeconds(spec, 8000, AudioAnalyzer.HOP, 0, spec.frameCount() - 1);
+        assertThat(dur).isGreaterThan(0.8).isLessThanOrEqualTo(1.0);
+    }
+
+    @Test
+    void dureeActiveSurSilenceEst0() throws Exception {
+        // Muet : aucune trame au-dessus du plancher → durée nulle (et non « fichier entier »).
+        Spectrogram spec = Spectrogram.compute(
+                AudioSample.load(ecrireWavMono(8000f, 0.3, (short) 0)), AudioAnalyzer.FFT_SIZE, AudioAnalyzer.HOP);
+        double dur = AudioAnalyzer.activeDurationSeconds(spec, 8000, AudioAnalyzer.HOP, 0, spec.frameCount() - 1);
+        assertThat(dur).isZero();
+    }
+
+    @Test
+    void binFrequenceHzEtInstantVersTrame() {
+        // bin → Hz : bin · sampleRate / fftSize ; instant → trame : t · sampleRate / hop (arrondi).
+        assertThat(AudioAnalyzer.binFrequencyHz(64, 8000, 1024)).isCloseTo(500, within(1e-9));
+        assertThat(AudioAnalyzer.frameForTime(0.5, 8000, 256)).isEqualTo((int) Math.round(0.5 * 8000 / 256));
+    }
+
     private static Path ecrireBruitWav(float sampleRate, double seconds) throws IOException {
         int n = (int) (sampleRate * seconds);
         byte[] data = new byte[n * 2];

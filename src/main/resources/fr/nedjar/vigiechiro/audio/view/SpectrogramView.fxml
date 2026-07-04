@@ -4,6 +4,7 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.shape.Line?>
+<?import javafx.scene.shape.Rectangle?>
 
 <!--
   Sous-vue du spectrogramme (custom control fx:root extends StackPane). Insérée par AudioView via
@@ -18,6 +19,8 @@
   <Pane fx:id="plotHost" styleClass="audio-view-plot-area" minWidth="0" minHeight="0">
     <ImageView fx:id="image" managed="false" smooth="false" pickOnBounds="false"/>
     <Pane fx:id="axisLayer" mouseTransparent="true"/>
+    <Rectangle fx:id="highlight" styleClass="audio-view-highlight" managed="false"
+               mouseTransparent="true" visible="false"/>
     <Line fx:id="cursor" styleClass="audio-view-cursor" managed="false"/>
   </Pane>
   <Pane fx:id="legend" styleClass="audio-view-legend" StackPane.alignment="TOP_RIGHT"
