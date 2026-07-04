@@ -51,6 +51,55 @@ class AudioViewModelTest {
     }
 
     @Test
+    void conversionTempsReelFichierSuitLeFacteur() {
+        // temps réel = temps fichier ÷ facteur ; réciproque × facteur (issues #51/#52/#50).
+        AudioViewModel vm = new AudioViewModel();
+        assertThat(vm.toRealTime(2.0)).isCloseTo(2.0, within(1e-9)); // facteur 1 : identité
+        assertThat(vm.toFileTime(2.0)).isCloseTo(2.0, within(1e-9));
+        vm.timeExpansionFactorProperty().set(10);
+        assertThat(vm.toRealTime(2.0)).isCloseTo(0.2, within(1e-9));
+        assertThat(vm.toFileTime(0.2)).isCloseTo(2.0, within(1e-9));
+    }
+
+    @Test
+    void seekReelSansFichierResteA0() {
+        // seek borné : sans fichier chargé (durée 0), positionner est un no-op.
+        AudioViewModel vm = new AudioViewModel();
+        vm.seekReal(1.5);
+        assertThat(vm.getCurrentTimeReal()).isZero();
+    }
+
+    @Test
+    void surlignageStockeEnReelEtSeProjetteEnFichier() {
+        // L'API surligne en temps réel {debut, fin} ; la projection fichier (× facteur) sert au tracé.
+        AudioViewModel vm = new AudioViewModel();
+        vm.timeExpansionFactorProperty().set(10);
+        vm.setHighlightWindow(0.4, 0.2); // bornes réordonnées
+        assertThat(vm.getHighlightWindow()).containsExactly(0.2, 0.4);
+        assertThat(vm.highlightWindowFile()).containsExactly(2.0, 4.0);
+        vm.clearHighlightWindow();
+        assertThat(vm.getHighlightWindow()).isNull();
+        assertThat(vm.highlightWindowFile()).isNull();
+    }
+
+    @Test
+    void surlignageBorneNonFinieEfface() {
+        AudioViewModel vm = new AudioViewModel();
+        vm.setHighlightWindow(0.1, 0.2);
+        vm.setHighlightWindow(Double.NaN, 0.2);
+        assertThat(vm.getHighlightWindow()).isNull();
+    }
+
+    @Test
+    void grandeursNaNSansFichier() {
+        // Aucune source chargée : les grandeurs acoustiques restent indéterminées.
+        AudioViewModel vm = new AudioViewModel();
+        assertThat(vm.getFmeHz()).isNaN();
+        assertThat(vm.getFrequenceTerminaleHz()).isNaN();
+        assertThat(vm.getDureeMs()).isNaN();
+    }
+
+    @Test
     void formatLoadErrorTraduitLesCausesCourantes() {
         // Message dédié pour les deux causes typiques (format inattendu / fichier illisible).
         assertThat(AudioViewModel.formatLoadError(new UnsupportedAudioFileException("x")))

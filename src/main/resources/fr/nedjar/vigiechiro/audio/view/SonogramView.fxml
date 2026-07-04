@@ -4,6 +4,7 @@
 <?import javafx.scene.layout.Pane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.shape.Line?>
+<?import javafx.scene.shape.Rectangle?>
 
 <!--
   Sous-vue du sonogramme (custom control fx:root extends StackPane). Insérée par AudioView via
@@ -24,6 +25,8 @@
         minWidth="0" minHeight="0">
     <Pane fx:id="axisLayer" mouseTransparent="true"/>
     <Canvas fx:id="canvas"/>
+    <Rectangle fx:id="highlight" styleClass="audio-view-highlight" managed="false"
+               mouseTransparent="true" visible="false"/>
     <Line fx:id="cursor" styleClass="audio-view-cursor" managed="false"/>
   </Pane>
 </fx:root>

@@ -3,6 +3,7 @@ package fr.nedjar.vigiechiro.audio.viewmodel;
 import fr.nedjar.vigiechiro.audio.dsp.AudioSample;
 import fr.nedjar.vigiechiro.audio.render.SpectrogramImageFactory;
 import javafx.beans.binding.DoubleBinding;
+import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyObjectProperty;
@@ -55,6 +56,11 @@ public final class SpectrogramViewModel {
         return session.windowDurationBinding();
     }
 
+    /** Fenêtre surlignée projetée en temps fichier {@code {debut, fin}} (ou null), pour le tracé (issue #52). */
+    public ObjectBinding<double[]> highlightWindowFileBinding() {
+        return session.highlightWindowFileBinding();
+    }
+
     public ReadOnlyDoubleProperty spectroMinDbProperty() {
         return session.spectroMinDbProperty();
     }
@@ -103,6 +109,11 @@ public final class SpectrogramViewModel {
 
     public double currentTime() {
         return session.getCurrentTime();
+    }
+
+    /** Fenêtre surlignée courante en temps fichier {@code {debut, fin}} (ou null). */
+    public double[] highlightWindowFile() {
+        return session.highlightWindowFile();
     }
 
     // ----- Commandes -----

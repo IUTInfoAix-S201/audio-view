@@ -51,6 +51,8 @@ class SonogramViewModelTest {
         assertThat(vm.currentTimeProperty()).isSameAs(session.currentTimeProperty());
         assertThat(vm.windowStartBinding()).isSameAs(session.windowStartBinding());
         assertThat(vm.windowDurationBinding()).isSameAs(session.windowDurationBinding());
+        assertThat(vm.highlightWindowFileBinding()).isSameAs(session.highlightWindowFileBinding());
+        assertThat(vm.highlightWindowFile()).isEqualTo(session.highlightWindowFile());
     }
 
     @Test

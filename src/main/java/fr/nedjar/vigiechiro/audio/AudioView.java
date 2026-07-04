@@ -13,12 +13,12 @@ import java.util.Collections;
 import java.util.List;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.BooleanPropertyBase;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.ReadOnlyBooleanProperty;
 import javafx.beans.property.ReadOnlyDoubleProperty;
 import javafx.beans.property.ReadOnlyStringProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.css.CssMetaData;
 import javafx.css.PseudoClass;
 import javafx.css.Styleable;
@@ -94,48 +94,12 @@ public class AudioView extends BorderPane {
         }
     };
 
-    // Champ porteur de la propriété JavaFX "lightTheme". La Javadoc publique est sur
-    // lightThemeProperty() ; éviter de la dupliquer ici évite le warning javadoc
-    // "Duplicate comment for property".
-    private final BooleanProperty lightTheme = new BooleanPropertyBase(false) {
-        @Override
-        protected void invalidated() {
-            applyTheme(get());
-        }
-
-        @Override
-        public Object getBean() {
-            return AudioView.this;
-        }
-
-        @Override
-        public String getName() {
-            return "lightTheme";
-        }
-    };
-
-    // Champ porteur de la propriété JavaFX "colorblindFriendly" (issue #24). La Javadoc publique
-    // est sur colorblindFriendlyProperty() ; éviter la duplication ici évite le warning javadoc
-    // "Duplicate comment for property".
-    private final BooleanProperty colorblindFriendly = new BooleanPropertyBase(false) {
-        @Override
-        protected void invalidated() {
-            // Pseudo-classe :colorblind → la couleur de l'onde du sonogramme suit (via CSS), en plus
-            // de la colormap Viridis du spectrogramme appliquée par applyTheme.
-            AudioView.this.pseudoClassStateChanged(COLORBLIND, get());
-            applyTheme(lightTheme.get());
-        }
-
-        @Override
-        public Object getBean() {
-            return AudioView.this;
-        }
-
-        @Override
-        public String getName() {
-            return "colorblindFriendly";
-        }
-    };
+    // Champs porteurs des propriétés JavaFX "lightTheme" / "colorblindFriendly" (issue #24). La Javadoc
+    // publique est sur lightThemeProperty() / colorblindFriendlyProperty() ; éviter de la dupliquer ici
+    // évite le warning javadoc "Duplicate comment for property". Les effets de bord (bascule de thème /
+    // colormap) sont câblés par des listeners dans le constructeur.
+    private final BooleanProperty lightTheme = new SimpleBooleanProperty(this, "lightTheme", false);
+    private final BooleanProperty colorblindFriendly = new SimpleBooleanProperty(this, "colorblindFriendly", false);
 
     private final AudioViewModel vm = new AudioViewModel();
     private final SonogramViewModel sonoVm = new SonogramViewModel(vm);
@@ -178,6 +142,15 @@ public class AudioView extends BorderPane {
         setFocusTraversable(true);
         setAccessibleRoleDescription("Visualiseur audio (sonogramme et spectrogramme)");
         setOnKeyPressed(e -> AudioViewShortcuts.handle(e, this, vm));
+
+        // Effets de bord des bascules de thème : pseudo-classe CSS + colormap du spectrogramme.
+        lightTheme.addListener((o, a, light) -> applyTheme(light));
+        colorblindFriendly.addListener((o, a, cb) -> {
+            // Pseudo-classe :colorblind → la couleur de l'onde du sonogramme suit (via CSS), en plus de
+            // la colormap Viridis du spectrogramme appliquée par applyTheme.
+            pseudoClassStateChanged(COLORBLIND, cb);
+            applyTheme(lightTheme.get());
+        });
     }
 
     /** Câblage shell + branchement des sous-vues, appelé par FXMLLoader après injection des @FXML. */
@@ -422,35 +395,124 @@ public class AudioView extends BorderPane {
         vm.spectrogramNormalisationProperty().set(value);
     }
 
-    /// Position courante du curseur dans le **temps du fichier**, en secondes.
+    /// Position courante du curseur en **temps réel** (secondes affichées), c.-à-d. cohérente avec
+    /// les axes et avec [#seek(double)].
     ///
-    /// **Indépendante** du facteur d'expansion ([#timeExpansionFactorProperty()]) : c'est le
-    /// temps réel de lecture, utilisable pour piloter d'autres composants synchronisés. Mise à
-    /// jour ~60 fois par seconde pendant la lecture.
+    /// **Temps réel = temps fichier ÷ facteur d'expansion** ([#timeExpansionFactorProperty()]) : pour
+    /// un enregistrement chiroptère ralenti ×10, `2.0` s de fichier valent `0.2` s réelles. Quand le
+    /// facteur vaut `1` (défaut) réel et fichier coïncident. Mise à jour ~60 fois par seconde pendant
+    /// la lecture.
     ///
     /// @return propriété lecture seule ; valeur par défaut `0`
     public final ReadOnlyDoubleProperty currentTimeProperty() {
-        return vm.currentTimeProperty();
+        return vm.currentTimeRealProperty();
     }
 
-    /// Temps courant de lecture, en secondes fichier.
+    /// Temps courant de lecture, en secondes réelles (cf. [#currentTimeProperty()]).
     public final double getCurrentTime() {
-        return vm.getCurrentTime();
+        return vm.getCurrentTimeReal();
     }
 
-    /// Durée totale de l'extrait, en **temps du fichier**, en secondes.
+    /// Durée totale de l'extrait en **temps réel** (secondes affichées), cohérente avec les axes.
     ///
-    /// `0` tant qu'aucun fichier n'est chargé ou que l'analyse est en cours ; renseignée quand
-    /// la tâche d'analyse termine ; reset à `0` à chaque nouveau chargement.
+    /// **Temps réel = temps fichier ÷ facteur d'expansion** ([#timeExpansionFactorProperty()]). `0`
+    /// tant qu'aucun fichier n'est chargé ou que l'analyse est en cours ; renseignée quand la tâche
+    /// d'analyse termine ; reset à `0` à chaque nouveau chargement.
     ///
     /// @return propriété lecture seule
     public final ReadOnlyDoubleProperty durationProperty() {
-        return vm.durationProperty();
+        return vm.durationRealProperty();
     }
 
-    /// Durée totale en secondes fichier, `0` si pas encore disponible.
+    /// Durée totale en secondes réelles, `0` si pas encore disponible.
     public final double getDuration() {
-        return vm.getDuration();
+        return vm.getDurationReal();
+    }
+
+    /// Positionne la lecture / le curseur à l'instant `secondes`, en **temps réel** (mêmes secondes que
+    /// les axes et [#currentTimeProperty()], donc dépendantes de [#timeExpansionFactorProperty()]).
+    /// Issue #51.
+    ///
+    /// Converti en temps fichier (× facteur) puis **clampé** à `[0, durée]` ; sans effet tant qu'aucun
+    /// fichier n'est chargé. Fonctionne que la lecture soit en cours ou en pause. Usage type : à la
+    /// sélection d'un cri, `seek(debutDuCri)` cale la lecture dessus.
+    public final void seek(double secondes) {
+        vm.seekReal(secondes);
+    }
+
+    /// Fenêtre temporelle **surlignée** (un cri) mise en évidence sur l'onde ET le spectrogramme
+    /// (issue #52). Valeur : `{debut, fin}` en **secondes réelles** (mêmes secondes que les axes et
+    /// [#currentTimeProperty()]), ou `null` si aucun surlignage.
+    ///
+    /// Le rendu est une bande translucide aux mêmes bornes temporelles sur les deux tracés. Régler la
+    /// sélection **recalcule aussi** les grandeurs acoustiques ([#fmeHzProperty()]…) sur cette fenêtre.
+    /// Effacée automatiquement au chargement d'un nouveau fichier. Modifiable via cette propriété, via
+    /// [#highlightWindow(double, double)] ou [#clearHighlight()].
+    ///
+    /// @return propriété observable et bidirectionnelle ; valeur par défaut `null`
+    public final ObjectProperty<double[]> highlightedWindowProperty() {
+        return vm.highlightWindowProperty();
+    }
+
+    /// Fenêtre surlignée courante `{debut, fin}` en secondes réelles, ou `null`.
+    public final double[] getHighlightedWindow() {
+        return vm.getHighlightWindow();
+    }
+
+    /// Surligne la fenêtre `[debut, fin]` (secondes réelles) sur l'onde et le spectrogramme (issue #52).
+    /// Les bornes sont réordonnées au besoin ; une borne non finie efface le surlignage. Voir
+    /// [#highlightedWindowProperty()].
+    public final void highlightWindow(double debut, double fin) {
+        vm.setHighlightWindow(debut, fin);
+    }
+
+    /// Efface le surlignage (équivalent à `highlightedWindowProperty().set(null)`).
+    public final void clearHighlight() {
+        vm.clearHighlightWindow();
+    }
+
+    /// **FME — Fréquence du Maximum d'Énergie** (Hz réels), grandeur acoustique de référence pour trier
+    /// les cris (issue #50). Fréquence où l'énergie est maximale sur la fenêtre analysée : la
+    /// [#highlightedWindowProperty()] si une sélection est active, sinon le fichier entier. Exprimée en
+    /// **fréquence réelle** (× facteur d'expansion). Recalculée au chargement et à chaque changement de
+    /// sélection ou de facteur ; `NaN` tant qu'aucun fichier n'est chargé.
+    ///
+    /// @return propriété lecture seule ; valeur par défaut `NaN`
+    public final ReadOnlyDoubleProperty fmeHzProperty() {
+        return vm.fmeHzProperty();
+    }
+
+    /// FME courante en Hz réels, `NaN` si indéterminée.
+    public final double getFmeHz() {
+        return vm.getFmeHz();
+    }
+
+    /// **Fréquence terminale** (Hz réels) — heuristique de fin de balayage FM sur la fenêtre analysée
+    /// (cf. [#fmeHzProperty()] pour la portée). Approximation : sur un cri à fréquence quasi constante
+    /// elle rejoint la FME. Recalculée comme les autres grandeurs ; `NaN` si indéterminée. Issue #50.
+    ///
+    /// @return propriété lecture seule ; valeur par défaut `NaN`
+    public final ReadOnlyDoubleProperty frequenceTerminaleHzProperty() {
+        return vm.frequenceTerminaleHzProperty();
+    }
+
+    /// Fréquence terminale courante en Hz réels, `NaN` si indéterminée.
+    public final double getFrequenceTerminaleHz() {
+        return vm.getFrequenceTerminaleHz();
+    }
+
+    /// **Durée du cri** mesurée sur le signal (millisecondes réelles) : extension des trames actives de
+    /// la fenêtre analysée (cf. [#fmeHzProperty()] pour la portée), convertie en temps réel (÷ facteur).
+    /// Plus robuste qu'un simple `fin - debut` car mesurée sur l'énergie. `NaN` si indéterminée. Issue #50.
+    ///
+    /// @return propriété lecture seule ; valeur par défaut `NaN`
+    public final ReadOnlyDoubleProperty dureeMsProperty() {
+        return vm.dureeMsProperty();
+    }
+
+    /// Durée courante du cri en millisecondes réelles, `NaN` si indéterminée.
+    public final double getDureeMs() {
+        return vm.getDureeMs();
     }
 
     /// Zoom temporel : facteur multiplicatif appliqué à l'axe horizontal des deux tracés.
@@ -500,13 +562,15 @@ public class AudioView extends BorderPane {
     /// Facteur d'expansion temporelle des enregistrements — typiquement `10` pour les WAV de
     /// chiroptères ralentis ×10 à l'acquisition.
     ///
-    /// **N'affecte que les libellés affichés** (graduations temps/fréquence et label de la
-    /// barre d'outils) :
-    /// - fréquence affichée = `fréquence_fichier × facteur` (kHz au lieu d'Hz pour ×10) ;
-    /// - temps affiché = `temps_fichier ÷ facteur`.
+    /// Définit la conversion entre valeurs **fichier** (l'audio réellement stocké) et valeurs
+    /// **réelles** (celles du terrain, affichées) :
+    /// - fréquence réelle = `fréquence_fichier × facteur` (kHz au lieu d'Hz pour ×10) ;
+    /// - temps réel = `temps_fichier ÷ facteur`.
     ///
-    /// [#currentTimeProperty()] et [#durationProperty()] **restent en temps du fichier** : c'est
-    /// le temps utilisé pour la lecture audio et pour la synchronisation avec d'autres composants.
+    /// **Toute l'API temporelle publique parle en temps réel** : [#currentTimeProperty()],
+    /// [#durationProperty()], [#seek(double)] et [#highlightWindow(double, double)] sont exprimées en
+    /// secondes réelles (÷ facteur), et les grandeurs acoustiques ([#fmeHzProperty()]…) en fréquences
+    /// réelles (× facteur). Quand le facteur vaut `1` (défaut) réel et fichier coïncident.
     ///
     /// @return propriété observable et bidirectionnelle ; valeur par défaut `1`
     public final DoubleProperty timeExpansionFactorProperty() {

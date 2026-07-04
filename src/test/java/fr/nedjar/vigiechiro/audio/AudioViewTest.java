@@ -66,6 +66,66 @@ class AudioViewTest extends ApplicationTest {
         assertThat(view.isReady()).isFalse();
     }
 
+    @Test
+    void seekPositionneLeCurseurEnTempsReel() throws Exception {
+        // Seek programmatique (issue #51) : en temps réel (facteur 1 ici), clampé à [0, durée].
+        Path wav = ecrireSinusWav(38_400f, 1.0);
+        interact(() -> view.setAudioFile(wav));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.isReady());
+
+        interact(() -> view.seek(0.5));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.getCurrentTime()).isCloseTo(0.5, Offset.offset(0.05));
+
+        // Au-delà de la durée : clampé à la durée. En deçà de 0 : clampé à 0.
+        interact(() -> view.seek(999));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.getCurrentTime()).isCloseTo(view.getDuration(), Offset.offset(0.05));
+        interact(() -> view.seek(-5));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.getCurrentTime()).isZero();
+    }
+
+    @Test
+    void surlignageExposeLaFenetreEnTempsReel() throws Exception {
+        // Surlignage d'un cri (issue #52) : la fenêtre est exposée en temps réel {debut, fin}.
+        Path wav = ecrireSinusWav(38_400f, 1.0);
+        interact(() -> view.setAudioFile(wav));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.isReady());
+
+        interact(() -> view.highlightWindow(0.2, 0.4));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.getHighlightedWindow()).containsExactly(0.2, 0.4);
+
+        interact(() -> view.clearHighlight());
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.getHighlightedWindow()).isNull();
+    }
+
+    @Test
+    void grandeursAcoustiquesRenseigneesApresChargement() throws Exception {
+        // FME / durée exposées après analyse (issue #50). Sinus 4 kHz -> FME ~ 4 kHz (facteur 1).
+        Path wav = ecrireSinusWav(38_400f, 1.0);
+        interact(() -> view.setAudioFile(wav));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.isReady());
+
+        assertThat(view.getFmeHz()).isCloseTo(4000, Offset.offset(60.0));
+        assertThat(view.getDureeMs()).isGreaterThan(0);
+    }
+
+    @Test
+    void tempsReelEtFrequencesSuiventLeFacteurDExpansion() throws Exception {
+        // Convention (issues #50/#51/#52) : temps réel = temps fichier ÷ facteur, fréquence = × facteur.
+        Path wav = ecrireSinusWav(38_400f, 1.0);
+        interact(() -> view.setAudioFile(wav));
+        WaitForAsyncUtils.waitFor(5, TimeUnit.SECONDS, () -> view.isReady());
+
+        interact(() -> view.setTimeExpansionFactor(10));
+        WaitForAsyncUtils.waitForFxEvents();
+        assertThat(view.getDuration()).isCloseTo(0.1, Offset.offset(0.02)); // 1 s fichier ÷ 10
+        assertThat(view.getFmeHz()).isCloseTo(40_000, Offset.offset(700.0)); // 4 kHz × 10
+    }
+
     private static Path ecrireSinusWav(float sampleRate, double seconds) throws IOException {
         int n = (int) (sampleRate * seconds);
         byte[] data = new byte[n * 2];

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import javafx.beans.binding.Bindings;
 import javafx.beans.binding.DoubleBinding;
+import javafx.beans.binding.ObjectBinding;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.ObjectProperty;
@@ -106,6 +107,28 @@ public final class AudioViewModel {
     private final DoubleBinding windowDurationBinding = Bindings.createDoubleBinding(
             () -> windowDuration(playback.duration(), timeZoom.get()), playback.durationProperty(), timeZoom);
 
+    // Temps RÉEL exposé à l'API publique (issues #51/#52/#50) : temps affiché = temps fichier ÷ facteur
+    // d'expansion, cohérent avec les axes. Le temps FICHIER reste l'unité interne (lecture, fenêtres,
+    // trames STFT) ; ces deux propriétés en sont la vue « réelle », recalculée quand le temps fichier
+    // ou le facteur change.
+    private final ReadOnlyDoubleWrapper currentTimeReal = new ReadOnlyDoubleWrapper(this, "currentTimeReal", 0);
+    private final ReadOnlyDoubleWrapper durationReal = new ReadOnlyDoubleWrapper(this, "durationReal", 0);
+
+    // Fenêtre temporelle surlignée (cri), en temps RÉEL {debut, fin} ou null (issue #52). Réglée par
+    // l'API publique ; sa projection en temps FICHIER (highlightWindowFile) sert au tracé (Rectangle sur
+    // l'onde et le spectrogramme) et à restreindre les grandeurs acoustiques au cri.
+    private final ObjectProperty<double[]> highlightWindow = new SimpleObjectProperty<>(this, "highlightWindow", null);
+    private final ObjectBinding<double[]> highlightWindowFile =
+            Bindings.createObjectBinding(() -> toFileWindow(highlightWindow.get()), highlightWindow, timeExpansion);
+
+    // Grandeurs acoustiques par cri (issue #50), en unités RÉELLES : FME et fréquence terminale en Hz
+    // (× facteur), durée en ms (÷ facteur). Recalculées au chargement, sur changement de sélection et de
+    // facteur d'expansion. NaN tant qu'indéterminé (aucun fichier chargé).
+    private final ReadOnlyDoubleWrapper fmeHz = new ReadOnlyDoubleWrapper(this, "fmeHz", Double.NaN);
+    private final ReadOnlyDoubleWrapper frequenceTerminaleHz =
+            new ReadOnlyDoubleWrapper(this, "frequenceTerminaleHz", Double.NaN);
+    private final ReadOnlyDoubleWrapper dureeMs = new ReadOnlyDoubleWrapper(this, "dureeMs", Double.NaN);
+
     // Conservés pour reconstruire l'image du spectrogramme quand la colormap change (bascule thème).
     private Spectrogram spectrogram;
     private Colormap colormap = Colormap.SOMBRE;
@@ -116,7 +139,18 @@ public final class AudioViewModel {
         spectrogramNormalisation.addListener((o, a, b) -> applySpectroRange());
         playback.currentTimeProperty().addListener((o, a, b) -> updateTimeText());
         playback.durationProperty().addListener((o, a, b) -> updateTimeText());
-        timeExpansion.addListener((o, a, b) -> updateTimeText());
+        timeExpansion.addListener((o, a, b) -> {
+            updateTimeText();
+            recomputeMeasures();
+        });
+        // Vue « temps réel » du temps de lecture / de la durée (÷ facteur d'expansion). Bornée aux
+        // propriétés fichier + facteur pour se réactualiser dès que l'un change (issues #51/#52/#50).
+        currentTimeReal.bind(Bindings.createDoubleBinding(
+                () -> toRealTime(playback.currentTime()), playback.currentTimeProperty(), timeExpansion));
+        durationReal.bind(Bindings.createDoubleBinding(
+                () -> toRealTime(playback.duration()), playback.durationProperty(), timeExpansion));
+        // La sélection change → grandeurs acoustiques recalculées sur la nouvelle fenêtre (issue #50).
+        highlightWindow.addListener((o, a, b) -> recomputeMeasures());
     }
 
     // ----- Commandes (déléguées au PlaybackModel) -----
@@ -128,6 +162,32 @@ public final class AudioViewModel {
     /** Positionne la lecture (temps fichier, en secondes), borné à [0, durée]. */
     public void seek(double tFile) {
         playback.seek(tFile);
+    }
+
+    /**
+     * Positionne la lecture en <b>temps réel</b> (secondes affichées) : converti en temps fichier (×
+     * facteur d'expansion) puis borné à [0, durée]. Point d'entrée de l'API publique {@code
+     * AudioView.seek(double)} (issue #51).
+     */
+    public void seekReal(double tReal) {
+        playback.seek(toFileTime(tReal));
+    }
+
+    /**
+     * Définit la fenêtre temporelle surlignée (cri) en <b>temps réel</b> {@code {debut, fin}} secondes
+     * (issue #52). Les bornes sont réordonnées ; toute valeur non finie efface le surlignage.
+     */
+    public void setHighlightWindow(double debutReal, double finReal) {
+        if (!Double.isFinite(debutReal) || !Double.isFinite(finReal)) {
+            highlightWindow.set(null);
+            return;
+        }
+        highlightWindow.set(new double[] {Math.min(debutReal, finReal), Math.max(debutReal, finReal)});
+    }
+
+    /** Efface la fenêtre surlignée (issue #52). */
+    public void clearHighlightWindow() {
+        highlightWindow.set(null);
     }
 
     public void dispose() {
@@ -149,6 +209,9 @@ public final class AudioViewModel {
         spectroMaxDb.set(MAX_DB);
         errorMessage.set(null);
         ready.set(false);
+        // Un nouveau fichier invalide la sélection précédente (bornes en temps réel du fichier d'avant).
+        highlightWindow.set(null);
+        recomputeMeasures();
         if (path == null) {
             return;
         }
@@ -174,6 +237,8 @@ public final class AudioViewModel {
             // normalisation peak au rendu (gain pré-multiplié) sans re-décoder le fichier (issue #32).
             playback.loadSource(result.sample().samples(), result.sample().sampleRate());
             playback.setDuration(result.durationSeconds());
+            // Grandeurs acoustiques du fichier entier (aucune sélection à ce stade) — issue #50.
+            recomputeMeasures();
             // ready en DERNIER : le signal n'est émis qu'une fois TOUT en place (sample, image,
             // duration, frequencyZoom calé) — les listeners qui prennent un snapshot voient déjà
             // l'état final.
@@ -222,6 +287,44 @@ public final class AudioViewModel {
         }
     }
 
+    /**
+     * Recalcule les grandeurs acoustiques (FME, fréquence terminale, durée) en unités <b>réelles</b>,
+     * sur la fenêtre surlignée si présente, sinon sur le fichier entier (issue #50). Les fréquences
+     * fichier sont multipliées par le facteur d'expansion, la durée fichier divisée puis convertie en
+     * ms. {@code NaN} tant qu'aucun spectrogramme n'est disponible.
+     */
+    private void recomputeMeasures() {
+        AudioSample s = sample.get();
+        if (spectrogram == null || s == null || spectrogram.frameCount() == 0) {
+            fmeHz.set(Double.NaN);
+            frequenceTerminaleHz.set(Double.NaN);
+            dureeMs.set(Double.NaN);
+            return;
+        }
+        double sr = s.sampleRate();
+        double factor = expansionFactor();
+        int lastFrame = spectrogram.frameCount() - 1;
+        int f0 = 0;
+        int f1 = lastFrame;
+        double[] win = highlightWindowFile.get();
+        if (win != null) {
+            int a = clampFrame(AudioAnalyzer.frameForTime(win[0], sr, AudioAnalyzer.HOP), lastFrame);
+            int b = clampFrame(AudioAnalyzer.frameForTime(win[1], sr, AudioAnalyzer.HOP), lastFrame);
+            f0 = Math.min(a, b);
+            f1 = Math.max(a, b);
+        }
+        double fme = AudioAnalyzer.peakFrequencyHz(spectrogram, sr, AudioAnalyzer.FFT_SIZE, f0, f1);
+        double term = AudioAnalyzer.terminalFrequencyHz(spectrogram, sr, AudioAnalyzer.FFT_SIZE, f0, f1);
+        double dur = AudioAnalyzer.activeDurationSeconds(spectrogram, sr, AudioAnalyzer.HOP, f0, f1);
+        fmeHz.set(Double.isNaN(fme) ? Double.NaN : fme * factor);
+        frequenceTerminaleHz.set(Double.isNaN(term) ? Double.NaN : term * factor);
+        dureeMs.set(dur <= 0 ? Double.NaN : dur / factor * 1000.0);
+    }
+
+    private static int clampFrame(int frame, int last) {
+        return Math.max(0, Math.min(last, frame));
+    }
+
     /** Traduit en français les causes d'échec courantes de {@link AudioSample#load}. */
     public static String formatLoadError(Throwable cause) {
         if (cause instanceof UnsupportedAudioFileException) {
@@ -243,6 +346,25 @@ public final class AudioViewModel {
     public double expansionFactor() {
         double f = timeExpansion.get();
         return f > 0 ? f : 1;
+    }
+
+    /** Temps fichier → temps réel affiché (÷ facteur d'expansion). */
+    public double toRealTime(double tFile) {
+        return tFile / expansionFactor();
+    }
+
+    /** Temps réel affiché → temps fichier (× facteur d'expansion). */
+    public double toFileTime(double tReal) {
+        return tReal * expansionFactor();
+    }
+
+    /** Projette une fenêtre surlignée {@code {debut, fin}} de temps réel vers le temps fichier (ou null). */
+    private double[] toFileWindow(double[] realWindow) {
+        if (realWindow == null || realWindow.length < 2) {
+            return null;
+        }
+        double f = expansionFactor();
+        return new double[] {realWindow[0] * f, realWindow[1] * f};
     }
 
     public double windowDuration() {
@@ -402,6 +524,66 @@ public final class AudioViewModel {
 
     public ReadOnlyDoubleProperty durationProperty() {
         return playback.durationProperty();
+    }
+
+    // ----- Temps réel + surlignage + grandeurs (API publique d'AudioView) -----
+
+    public ReadOnlyDoubleProperty currentTimeRealProperty() {
+        return currentTimeReal.getReadOnlyProperty();
+    }
+
+    public double getCurrentTimeReal() {
+        return currentTimeReal.get();
+    }
+
+    public ReadOnlyDoubleProperty durationRealProperty() {
+        return durationReal.getReadOnlyProperty();
+    }
+
+    public double getDurationReal() {
+        return durationReal.get();
+    }
+
+    /** Fenêtre surlignée {@code {debut, fin}} en temps réel, ou {@code null} (issue #52). */
+    public ObjectProperty<double[]> highlightWindowProperty() {
+        return highlightWindow;
+    }
+
+    public double[] getHighlightWindow() {
+        return highlightWindow.get();
+    }
+
+    /** Projection en temps fichier de la fenêtre surlignée, pour le tracé des sous-vues (issue #52). */
+    public ObjectBinding<double[]> highlightWindowFileBinding() {
+        return highlightWindowFile;
+    }
+
+    public double[] highlightWindowFile() {
+        return highlightWindowFile.get();
+    }
+
+    public ReadOnlyDoubleProperty fmeHzProperty() {
+        return fmeHz.getReadOnlyProperty();
+    }
+
+    public double getFmeHz() {
+        return fmeHz.get();
+    }
+
+    public ReadOnlyDoubleProperty frequenceTerminaleHzProperty() {
+        return frequenceTerminaleHz.getReadOnlyProperty();
+    }
+
+    public double getFrequenceTerminaleHz() {
+        return frequenceTerminaleHz.get();
+    }
+
+    public ReadOnlyDoubleProperty dureeMsProperty() {
+        return dureeMs.getReadOnlyProperty();
+    }
+
+    public double getDureeMs() {
+        return dureeMs.get();
     }
 
     public ReadOnlyObjectProperty<AudioSample> sampleProperty() {

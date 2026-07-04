@@ -52,6 +52,9 @@ public final class SpectrogramView extends StackPane {
     private Pane axisLayer;
 
     @FXML
+    private Rectangle highlight;
+
+    @FXML
     private Line cursor;
 
     @FXML
@@ -107,6 +110,8 @@ public final class SpectrogramView extends StackPane {
         vm.windowDurationBinding().addListener(redraw);
         vm.frequencyZoomProperty().addListener(redraw);
         vm.currentTimeProperty().addListener((o, a, b) -> positionCursor());
+        // La sélection (fenêtre surlignée d'un cri) change → repositionner la bande (issue #52).
+        vm.highlightWindowFileBinding().addListener((o, a, b) -> positionHighlight());
 
         // La fenêtre dB courante peut changer (normalisation visuelle du spectro) : la légende doit
         // refléter les vraies bornes, on la reconstruit alors. Une fois construite avec les valeurs du VM.
@@ -130,6 +135,7 @@ public final class SpectrogramView extends StackPane {
     private void render() {
         updateImage();
         drawAxes();
+        positionHighlight();
         positionCursor();
     }
 
@@ -225,6 +231,20 @@ public final class SpectrogramView extends StackPane {
         double plotW = plotHost.getWidth() - AXIS_LEFT;
         double plotH = plotHost.getHeight() - AXIS_BOTTOM;
         AxisNodes.positionCursor(cursor, show, AXIS_LEFT + rel * plotW, 0, plotH);
+    }
+
+    /** Positionne la bande de surlignage du cri (temps fichier → pixels), même repère que le curseur. */
+    private void positionHighlight() {
+        if (vm == null) {
+            return;
+        }
+        double[] hw = vm.highlightWindowFile();
+        double plotW = plotHost.getWidth() - AXIS_LEFT;
+        double plotH = plotHost.getHeight() - AXIS_BOTTOM;
+        double[] span = hw == null
+                ? null
+                : AxisNodes.highlightSpan(hw[0], hw[1], vm.windowStart(), vm.windowDuration(), AXIS_LEFT, plotW);
+        AxisNodes.positionHighlight(highlight, span, 0, plotH);
     }
 
     private void seekFromX(double mouseX) {
