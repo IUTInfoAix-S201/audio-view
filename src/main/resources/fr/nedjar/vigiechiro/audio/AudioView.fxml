@@ -3,7 +3,7 @@
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
-<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.FlowPane?>
 <?import javafx.scene.layout.StackPane?>
 <?import javafx.scene.layout.VBox?>
 <?import fr.nedjar.vigiechiro.audio.view.SonogramView?>
@@ -23,7 +23,12 @@
          minWidth="200" prefWidth="640" prefHeight="360">
 
   <top>
-    <HBox fx:id="toolbar" styleClass="audio-view-toolbar" alignment="CENTER_LEFT" spacing="8">
+    <!-- FlowPane et non HBox (issue #56) : une HBox ne renvoie JAMAIS à la ligne, elle rétrécit ses
+         enfants - et un Button trop étroit ellipse son texte. Le composant étant embarqué dans des
+         mises en page qu'il ne choisit pas, il se retrouve à des largeurs où « Temps + » devenait
+         « Temps... ». Une barre d'actions doit plier : à l'étroit, les commandes passent sur une
+         seconde rangée et restent lisibles. `hgap`/`vgap` remplacent `spacing`, que FlowPane ignore. -->
+    <FlowPane fx:id="toolbar" styleClass="audio-view-toolbar" alignment="CENTER_LEFT" hgap="8" vgap="6">
       <padding>
         <Insets top="6" right="6" bottom="6" left="6"/>
       </padding>
@@ -33,7 +38,7 @@
       <Button onAction="#onZoomFreqIn" text="Fréq. +"/>
       <Button onAction="#onZoomFreqOut" text="Fréq. -"/>
       <Label fx:id="timeLabel" text="0.00 / 0.00 s"/>
-    </HBox>
+    </FlowPane>
   </top>
 
   <center>
