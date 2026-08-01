@@ -59,7 +59,7 @@
          pour que "mvn test" hors agent ne laisse pas un @{...} littéral. -->
     <jacocoArgLine></jacocoArgLine>
 
-    <junit.version>6.1.1</junit.version>
+    <junit.version>6.1.2</junit.version>
     <assertj.version>3.27.7</assertj.version>
     <testfx.version>4.0.18</testfx.version>
 
