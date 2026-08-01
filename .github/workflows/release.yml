@@ -63,7 +63,7 @@ jobs:
         if: steps.tag.outputs.value != '' && env.CENTRAL_USERNAME != ''
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.6.0
         with:
           java-version: "25"
           distribution: "temurin"
