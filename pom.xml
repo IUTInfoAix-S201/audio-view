@@ -64,7 +64,7 @@
     <testfx.version>4.0.18</testfx.version>
 
     <!-- Outils qualité (alignés sur les TP R2.02 / R2.03). -->
-    <spotless.maven.plugin.version>3.6.0</spotless.maven.plugin.version>
+    <spotless.maven.plugin.version>3.9.0</spotless.maven.plugin.version>
     <palantir.java.format.version>2.91.0</palantir.java.format.version>
     <git.build.hook.plugin.version>3.6.0</git.build.hook.plugin.version>
     <maven.pmd.plugin.version>3.28.0</maven.pmd.plugin.version>
