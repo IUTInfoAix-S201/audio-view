@@ -23,7 +23,7 @@ jobs:
       # y echouaient donc en NPE (com.sun.glass.ui.PlatformFactory.getPlatformFactory() null).
       # Meme raison que le retrait du jdk+fx en CI cote TP R2.02.
       - name: Configurer JDK 25 (Temurin, vanilla)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: temurin
