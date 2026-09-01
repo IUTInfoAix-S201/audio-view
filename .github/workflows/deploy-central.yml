@@ -39,7 +39,7 @@ jobs:
           echo "Version à publier : ${LAST_TAG}"
 
       - name: Configurer JDK 25 (Temurin)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: "25"
           distribution: "temurin"
